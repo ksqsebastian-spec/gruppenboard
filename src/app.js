@@ -97,9 +97,7 @@ const I = {
   pin: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-5.7 7-11a7 7 0 1 0-14 0c0 5.3 7 11 7 11z"/><circle cx="12" cy="10" r="2.4"/></svg>',
 };
 
-const LOGO = (size = 28) => `<svg class="logo-mark" style="width:${size}px;height:${Math.round(size * 0.75)}px" viewBox="0 0 30 22" fill="none" stroke="currentColor" aria-hidden="true">
-<path d="M2 20.5V8.9l6.5-6.4 6.5 6.2 6.5-6.2 6.5 6.4v11.6" stroke-width="1.8" stroke-linejoin="miter"/>
-<path d="M0 21.2h30" stroke-width="1.2"/></svg>`;
+const LOGO = (size = 30) => pixelLogoSvg(size);
 
 /* ------------------------------------------------------------- Stammdaten */
 
@@ -2954,7 +2952,12 @@ $('#login-form').addEventListener('submit', async (e) => {
   }
 });
 
+function paintStaticLogos() {
+  $$('[data-logo]').forEach((el) => { el.innerHTML = pixelLogoSvg(Number(el.dataset.logo) || 30); });
+}
+
 async function boot() {
+  paintStaticLogos();
   try {
     await refresh();
   } catch {

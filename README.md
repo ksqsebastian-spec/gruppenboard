@@ -97,9 +97,11 @@ Seitentitel bei 32 Pixel mit enger Laufweite, Kennzahlen bei 34, daneben
 Beschriftungen bei 10,5 Pixel in Versalien. Keine Farbverläufe, keine
 Leuchtschatten, keine Schlagschatten außer bei Überlagerungen.
 
-Die Marke ist ein bloßes Zeichen ohne Kachel: zwei Dachkanten, die zusammen
-ein M und eine Häuserzeile ergeben, darunter eine Grundlinie. Es erbt die
-Textfarbe und funktioniert dadurch auf schwarzem wie auf weißem Grund.
+Die Bildmarke steht im selben Pixelraster wie die Profilbilder: zwei Giebel
+mit Fenstern und Tor, die zusammen ein M ergeben. Zwölf mal zehn Pixel,
+definiert in `src/pixel-avatars.js`, zur Laufzeit als SVG erzeugt. Das Dach
+nimmt die Textfarbe an, die Wände den Akzent — dadurch funktioniert die Marke
+auf weißem wie auf schwarzem Grund ohne zweite Fassung.
 
 ## Datenbestand
 
@@ -145,7 +147,7 @@ src/worker.js        Worker: JSON-API auf D1, Auth, Sitzungen, Auslieferung
 src/index.html       Shell inkl. Anmeldeseite und Logo
 src/styles.css       Design-System (Tokens, Komponenten, helles/dunkles Design)
 src/app.js           Single-Page-Anwendung (Vanilla JS, keine Abhängigkeiten)
-src/pixel-avatars.js Zwölf Pixel-Tiere als 12x12-Raster
+src/pixel-avatars.js Zwölf Pixel-Tiere und die Bildmarke als Pixelraster
 schema.sql           Datenbankschema
 seed.sql             Erzeugt aus scripts/gen-seed.mjs (Konten + Beispieldaten)
 scripts/build.mjs    Bettet HTML/CSS/JS in dist/worker.js ein

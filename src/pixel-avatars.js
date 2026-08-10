@@ -272,3 +272,50 @@ function pixelAvatarUrl(key) {
   PIXEL_CACHE[key] = 'data:image/svg+xml,' + encodeURIComponent(svg);
   return PIXEL_CACHE[key];
 }
+
+/* ==========================================================================
+   Bildmarke im selben Pixelraster wie die Profilbilder.
+   Zwei Giebel, die zusammen ein M ergeben. Das Dach nimmt die Textfarbe an,
+   damit die Marke auf hellem und dunklem Grund funktioniert.
+   ========================================================================== */
+
+const PIXEL_LOGO = [
+  '..11....11..',
+  '.1111..1111.',
+  '111111111111',
+  '111111111111',
+  '222222222222',
+  '223322223322',
+  '223322223322',
+  '222222222222',
+  '222223322222',
+  '222223322222',
+];
+
+const LOGO_FILL = { 1: 'currentColor', 2: 'var(--accent)', 3: '#fff' };
+
+let LOGO_RECTS = null;
+
+function pixelLogoInner() {
+  if (LOGO_RECTS) return LOGO_RECTS;
+  const rects = [];
+  PIXEL_LOGO.forEach((row, y) => {
+    let x = 0;
+    while (x < row.length) {
+      const ch = row[x];
+      if (ch === '.') { x++; continue; }
+      let w = 1;
+      while (x + w < row.length && row[x + w] === ch) w++;
+      rects.push(`<rect x="${x}" y="${y}" width="${w}" height="1" fill="${LOGO_FILL[ch]}"/>`);
+      x += w;
+    }
+  });
+  LOGO_RECTS = rects.join('');
+  return LOGO_RECTS;
+}
+
+function pixelLogoSvg(width) {
+  const w = width || 30;
+  return `<svg class="logo-mark" style="width:${w}px;height:${Math.round(w * 10 / 12)}px"`
+    + ` viewBox="0 0 12 10" shape-rendering="crispEdges" aria-hidden="true">${pixelLogoInner()}</svg>`;
+}
