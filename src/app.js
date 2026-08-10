@@ -104,10 +104,10 @@ const LOGO = (size = 28) => `<svg class="logo-mark" style="width:${size}px;heigh
 /* ------------------------------------------------------------- Stammdaten */
 
 const LABELS = [
-  ['Ankauf', '#B23A2C'], ['Verkauf', '#3F7A55'], ['Vermietung', '#3A5F88'],
-  ['Sanierung', '#8A6A1F'], ['Finanzierung', '#5F5486'], ['Recht', '#3D4045'],
-  ['Behörde', '#2F6E6B'], ['Marketing', '#8A4A6A'], ['Besichtigung', '#9A5B3A'],
-  ['Notar', '#5A5F68'], ['Buchhaltung', '#4A6B45'], ['Technik', '#7A6A58'],
+  ['Ankauf', '#E02E1E'], ['Verkauf', '#00A264'], ['Vermietung', '#0B63F6'],
+  ['Sanierung', '#C07C00'], ['Finanzierung', '#7A3BFF'], ['Recht', '#35353A'],
+  ['Behörde', '#0FA3A3'], ['Marketing', '#E0439B'], ['Besichtigung', '#F5601A'],
+  ['Notar', '#5A5F68'], ['Buchhaltung', '#3E8E3E'], ['Technik', '#8A5A2B'],
 ];
 const LABEL_COLOR = Object.fromEntries(LABELS);
 
@@ -151,7 +151,7 @@ const EVENT_TYPES = [
 ];
 const EVENT_TYPE_NAME = Object.fromEntries(EVENT_TYPES);
 
-const COLORS = ['#3F4247', '#3A5F88', '#B23A2C', '#8A6A1F', '#3F7A55', '#5F5486', '#7A6A58', '#2F6E6B', '#8A4A6A', '#5A5F68'];
+const COLORS = ['#0B63F6', '#00A264', '#7A3BFF', '#E0439B', '#E02E1E', '#C07C00', '#0FA3A3', '#35353A', '#8A5A2B', '#5A5F68'];
 
 /* ------------------------------------------------------------------ State */
 
@@ -1201,7 +1201,7 @@ function viewWelcome(root) {
 }
 
 function dealColor(k) {
-  return { ankauf: '#8A6A1F', bestand: '#3A5F88', vermarktung: '#B23A2C', verkauft: '#3F7A55', vermietet: '#5F5486' }[k] || '#9AA0A6';
+  return { ankauf: '#C07C00', bestand: '#0B63F6', vermarktung: '#E02E1E', verkauft: '#00A264', vermietet: '#7A3BFF' }[k] || '#9B9B9F';
 }
 
 function donut(parts, total) {

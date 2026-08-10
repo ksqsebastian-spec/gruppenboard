@@ -85,17 +85,21 @@ Text ausgedrückt.
 
 ## Gestaltung
 
-Weiß, Graustufen, Haarlinien. Keine Leitfarbe auf großen Flächen, keine
-Farbverläufe, keine Schlagschatten. Farbe trägt ausschließlich Bedeutung:
-Fristen, Objektstatus, Labels und Personen — jeweils als kleiner Punkt oder
-kurzer Text, nie als Fläche. Primäre Schaltflächen sind schwarz, alles andere
-ist weiß mit Rahmen. Radien zwischen 4 und 8 Pixeln, Zahlen laufen
-tabellarisch.
+Reduziert, aber mit Kontrast. Die Navigation ist schwarz, die Arbeitsfläche
+weiß, dazwischen nur Haarlinien. Ein einziger Akzent — ein kräftiges
+Signalorange (`#FF4A1C`) — trägt alles Handlungsrelevante: primäre
+Schaltflächen, die aktive Navigation, Fortschritt, Fokus, den heutigen Tag im
+Kalender. Weitere Farben tauchen ausschließlich als Information auf: Labels,
+Objektstatus, Prioritäten, Personen.
+
+Der Kontrast kommt aus dem Schriftgrad, nicht aus vielen Farben:
+Seitentitel bei 32 Pixel mit enger Laufweite, Kennzahlen bei 34, daneben
+Beschriftungen bei 10,5 Pixel in Versalien. Keine Farbverläufe, keine
+Leuchtschatten, keine Schlagschatten außer bei Überlagerungen.
 
 Die Marke ist ein bloßes Zeichen ohne Kachel: zwei Dachkanten, die zusammen
-ein M und eine Häuserzeile ergeben, darunter eine Grundlinie. Es nimmt die
-Textfarbe an und funktioniert dadurch in beiden Designs. Die Anmeldeseite ist
-ein schlichtes zentriertes Formular auf Weiß.
+ein M und eine Häuserzeile ergeben, darunter eine Grundlinie. Es erbt die
+Textfarbe und funktioniert dadurch auf schwarzem wie auf weißem Grund.
 
 ## Datenbestand
 
