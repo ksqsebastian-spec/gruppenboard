@@ -3,10 +3,15 @@
  * Projekte, Spalten, Aufgaben, Termine und Beispielhistorie.
  *
  *   node scripts/gen-seed.mjs "<Startpasswort>" > seed.sql
+ *   node scripts/gen-seed.mjs "<Startpasswort>" --users-only > seed.sql
+ *
+ * Mit --users-only werden nur die drei Konten erzeugt — keine Beispieldaten.
  */
 import { webcrypto as crypto } from 'node:crypto';
 
-const PASSWORD = process.argv[2] || 'Mikdaten#Immo2026';
+const args = process.argv.slice(2);
+const USERS_ONLY = args.includes('--users-only');
+const PASSWORD = args.find((a) => !a.startsWith('--')) || 'Mikdaten#Immo2026';
 
 /* --------------------------------------------------------------- Helfer */
 
@@ -169,6 +174,11 @@ const main = async () => {
     role: 'admin', job_title: u.job_title, phone: u.phone, initials: u.initials,
     color: u.color, created_at: stamp(-365),
   }));
+
+  if (USERS_ONLY) {
+    process.stdout.write(rows.join('\n') + '\n');
+    return;
+  }
 
   PROPS.forEach((p) => insert('properties', {
     id: p.id, code: p.code, title: p.title, street: p.street, zip: p.zip, city: p.city,

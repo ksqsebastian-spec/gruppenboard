@@ -85,6 +85,8 @@ const I = {
   euro: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 5.5A6.5 6.5 0 0 0 7.5 12 6.5 6.5 0 0 0 17 18.5M4 10.5h8M4 14h8"/></svg>',
   ruler: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="8" width="19" height="8" rx="2"/><path d="M7 8v3M11 8v4M15 8v3M19 8v4"/></svg>',
   bed: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18v-8M3 13h18v5M21 18v-3.5A2.5 2.5 0 0 0 18.5 12H12V8.5"/><circle cx="7" cy="9.5" r="1.8"/></svg>',
+  camera: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5A2.5 2.5 0 0 1 5.5 6h1.9a1 1 0 0 0 .83-.45l.9-1.35A1 1 0 0 1 9.96 3.8h4.08a1 1 0 0 1 .83.4l.9 1.35a1 1 0 0 0 .83.45h1.9A2.5 2.5 0 0 1 21 8.5v9A2.5 2.5 0 0 1 18.5 20h-13A2.5 2.5 0 0 1 3 17.5z"/><circle cx="12" cy="12.8" r="3.6"/></svg>',
+  star: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3.8 2.6 5.3 5.9.85-4.25 4.15 1 5.85L12 17.2l-5.25 2.75 1-5.85L3.5 9.95l5.9-.85z"/></svg>',
   pin: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-5.7 7-11a7 7 0 1 0-14 0c0 5.3 7 11 7 11z"/><circle cx="12" cy="10" r="2.4"/></svg>',
 };
 
@@ -152,13 +154,14 @@ const EMOJIS = ['🏠', '🏢', '🏗️', '🔑', '📐', '💼', '📄', '🧱
 const S = {
   me: null,
   users: [], projects: [], members: [], columns: [], tasks: [], comments: [],
-  checklist: [], properties: [], contacts: [], events: [], documents: [], activity: [],
+  checklist: [], properties: [], contacts: [], events: [], documents: [], photos: [], activity: [],
   route: { name: 'dashboard', id: null },
   boardView: 'board',
   filters: { q: '', assignee: null, priority: null, label: null, mine: false, overdue: false, deal: null },
   calMonth: (() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); })(),
   drawerTask: null,
   menuOpen: null,
+  lightbox: null,
 };
 
 const byId = (arr, id) => arr.find((x) => x.id === id) || null;
@@ -194,6 +197,72 @@ async function refresh() {
   const data = await api('/state');
   Object.assign(S, data);
   return data;
+}
+
+/* ------------------------------------------------------------ Bild-Upload */
+
+const propertyPhotos = (pid) => S.photos.filter((p) => p.property_id === pid);
+
+const MAX_UPLOAD = 12 * 1024 * 1024;
+const ALLOWED_IMAGES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif', 'image/heic'];
+
+async function uploadPhotos(propertyId, files) {
+  const list = Array.from(files || []);
+  if (!list.length) return;
+
+  const bad = list.filter((f) => !ALLOWED_IMAGES.includes(f.type));
+  if (bad.length) toast(`${bad.length} Datei(en) übersprungen — nur Bilder erlaubt.`, 'err');
+  const big = list.filter((f) => f.size > MAX_UPLOAD);
+  if (big.length) toast(`${big.length} Datei(en) übersprungen — größer als 12 MB.`, 'err');
+
+  const queue = list.filter((f) => ALLOWED_IMAGES.includes(f.type) && f.size <= MAX_UPLOAD);
+  if (!queue.length) return;
+
+  setUploadState(true, `0/${queue.length} hochgeladen …`);
+  let done = 0;
+  for (const file of queue) {
+    try {
+      const res = await fetch(`/api/photos/upload?property_id=${encodeURIComponent(propertyId)}`, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'x-mikdaten': '1',
+          'content-type': file.type,
+          'x-filename': encodeURIComponent(file.name),
+        },
+        body: file,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Fehler ${res.status}`);
+      }
+      done++;
+      setUploadState(true, `${done}/${queue.length} hochgeladen …`);
+    } catch (e) {
+      toast(`${file.name}: ${e.message}`, 'err');
+    }
+  }
+  setUploadState(false);
+  await refresh();
+  render();
+  if (done) toast(done === 1 ? 'Foto hinzugefügt.' : `${done} Fotos hinzugefügt.`);
+}
+
+function setUploadState(active, text) {
+  const zone = $('#photo-drop');
+  if (!zone) return;
+  zone.classList.toggle('busy', !!active);
+  const label = $('#photo-drop-label');
+  if (label) label.textContent = active ? text : 'Fotos hinzufügen';
+}
+
+function pickPhotos(propertyId) {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = ALLOWED_IMAGES.join(',');
+  input.multiple = true;
+  input.addEventListener('change', () => uploadPhotos(propertyId, input.files));
+  input.click();
 }
 
 /* ----------------------------------------------------------------- Toasts */
@@ -631,6 +700,9 @@ function calendarMonth(projectId) {
 /* ====================================================== Ansicht: Übersicht */
 
 function viewDashboard(root) {
+  if (!S.projects.length && !S.properties.length && !S.contacts.length) {
+    return viewWelcome(root);
+  }
   const openTasks = S.tasks.filter((t) => !isDoneTask(t));
   const overdue = openTasks.filter((t) => t.due_date && daysUntil(t.due_date) < 0);
   const dueWeek = openTasks.filter((t) => t.due_date && daysUntil(t.due_date) >= 0 && daysUntil(t.due_date) <= 7);
@@ -640,7 +712,7 @@ function viewDashboard(root) {
 
   // Verteilung Objekte nach Status
   const dealCounts = DEALS.map(([k, l, c]) => ({ k, l, c, n: S.properties.filter((p) => p.deal === k).length })).filter((d) => d.n);
-  const totalObj = dealCounts.reduce((s, d) => s + d.n, 0) || 1;
+  const totalObj = dealCounts.reduce((s, d) => s + d.n, 0);
 
   // Auslastung je Person
   const workload = S.users.map((u) => ({
@@ -699,12 +771,13 @@ function viewDashboard(root) {
 
       <div class="card card-pad">
         <b>Portfolio nach Status</b>
-        <div class="row" style="gap:20px;margin-top:16px">
+        ${totalObj ? `<div class="row" style="gap:20px;margin-top:16px">
           ${donut(dealCounts.map((d) => ({ n: d.n, color: dealColor(d.k) })), totalObj)}
           <div class="donut-legend">
             ${dealCounts.map((d) => `<div><i style="background:${dealColor(d.k)}"></i><span>${esc(d.l)}</span><b class="push" style="margin-left:auto">${d.n}</b></div>`).join('')}
           </div>
-        </div>
+        </div>` : `<div class="faint small" style="margin-top:14px">Noch keine Objekte erfasst.
+          <button class="link" data-act="property-new" style="margin-left:4px">Erstes Objekt anlegen</button></div>`}
       </div>
     </div>
 
@@ -756,15 +829,53 @@ function viewDashboard(root) {
   </div></div>`;
 }
 
+function viewWelcome(root) {
+  const step = (icon, title, text, act) => `
+    <button class="start-tile" data-act="${act}">
+      <span class="start-icon">${icon}</span>
+      <b>${esc(title)}</b>
+      <span class="small muted">${esc(text)}</span>
+      <span class="start-go">${I.plus} Anlegen</span>
+    </button>`;
+
+  root.innerHTML = `<div class="content"><div class="page" style="max-width:1000px">
+    <div class="start-hero">
+      ${LOGO(52)}
+      <h2>Willkommen bei Mikdaten, ${esc(S.me.name.split(' ')[0])}.</h2>
+      <p>Die Arbeitsumgebung ist leer und wartet auf eure echten Daten.
+         Am schnellsten geht es so: erst die Objekte erfassen, dann Projekte darauf aufsetzen.</p>
+    </div>
+
+    <div class="start-grid">
+      ${step(I.building, 'Objekt erfassen', 'Adresse, Fläche, Preise und Fotos — die Grundlage für alles Weitere.', 'property-new')}
+      ${step(I.board, 'Projekt anlegen', 'Ankauf, Vermarktung, Sanierung oder Verwaltung — mit Board und Standardspalten.', 'project-new')}
+      ${step(I.contact, 'Kontakt hinterlegen', 'Eigentümer, Käufer, Mieter, Notar, Handwerker und Banken.', 'contact-new')}
+    </div>
+
+    <div class="card card-pad" style="margin-top:22px">
+      <b>Gut zu wissen</b>
+      <div class="start-hints">
+        <div><span class="kbd">⌘K</span> öffnet die Suche und alle Befehle.</div>
+        <div><span class="kbd">n</span> legt jederzeit eine neue Aufgabe an.</div>
+        <div>Aufgaben lassen sich per Drag &amp; Drop zwischen den Spalten ziehen.</div>
+        <div>Objektfotos: einfach auf die Galerie ziehen — bis 12 MB pro Bild.</div>
+        <div>Jede Person ändert ihr Passwort unter <b>Einstellungen</b>.</div>
+        <div>Spalten, Namen und WIP-Limits sind pro Projekt frei konfigurierbar.</div>
+      </div>
+    </div>
+  </div></div>`;
+}
+
 function dealColor(k) {
   return { ankauf: '#E08D00', bestand: '#2F6DF6', vermarktung: '#FF4E5B', verkauft: '#12855F', vermietet: '#7A4DDB' }[k] || '#9aa0ab';
 }
 
 function donut(parts, total) {
+  const denom = total || 1;
   const R = 46, C = 2 * Math.PI * R;
   let offset = 0;
   const arcs = parts.map((p) => {
-    const len = (p.n / total) * C;
+    const len = (p.n / denom) * C;
     const el = `<circle cx="60" cy="60" r="${R}" fill="none" stroke="${p.color}" stroke-width="15"
       stroke-dasharray="${len - 2.5} ${C - len + 2.5}" stroke-dashoffset="${-offset}" transform="rotate(-90 60 60)" stroke-linecap="round"/>`;
     offset += len;
@@ -935,6 +1046,7 @@ function viewProperty(root) {
   const relProjects = S.projects.filter((x) => x.property_id === p.id);
   const relDocs = S.documents.filter((d) => d.property_id === p.id);
   const relEvents = S.events.filter((e) => e.property_id === p.id);
+  const shots = propertyPhotos(p.id);
   const yieldPct = p.rent_cold && (p.purchase_price || p.asking_price)
     ? ((p.rent_cold * 12) / (p.purchase_price || p.asking_price) * 100) : null;
 
@@ -958,6 +1070,7 @@ function viewProperty(root) {
             <div class="muted row" style="gap:5px;margin-top:3px">${I.pin}${esc([p.street, [p.zip, p.city].filter(Boolean).join(' ')].filter(Boolean).join(', ') || '—')}</div>
           </div>
           <div class="row" style="gap:8px">
+            <button class="btn btn-brand btn-sm" data-act="photo-pick" data-id="${esc(p.id)}">${I.camera} Fotos</button>
             <button class="btn btn-soft btn-sm" data-act="property-edit" data-id="${esc(p.id)}">${I.edit} Bearbeiten</button>
             <button class="btn btn-soft btn-sm" data-act="doc-new" data-property="${esc(p.id)}">${I.doc} Dokument</button>
           </div>
@@ -979,7 +1092,23 @@ function viewProperty(root) {
       </div>
     </div>
 
-    <div style="display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:16px;align-items:start">
+    <div class="section-title">Fotos (${shots.length})</div>
+    <div class="photo-grid" id="photo-drop" data-property="${esc(p.id)}">
+      ${shots.map((s) => `<figure class="photo" data-act="photo-open" data-id="${esc(s.id)}">
+        <img src="/media/${esc(s.key)}" alt="${esc(s.filename || 'Foto')}" loading="lazy">
+        ${s.is_cover ? '<span class="photo-cover">Titelbild</span>' : ''}
+        <div class="photo-tools">
+          ${s.is_cover ? '' : `<button title="Als Titelbild" data-act="photo-cover" data-id="${esc(s.id)}">${I.star}</button>`}
+          <button title="Löschen" data-act="photo-delete" data-id="${esc(s.id)}">${I.trash}</button>
+        </div>
+      </figure>`).join('')}
+      <button class="photo-add" data-act="photo-pick" data-id="${esc(p.id)}">
+        ${I.camera}<span id="photo-drop-label">Fotos hinzufügen</span>
+        <em class="tiny faint">oder hierher ziehen · JPG, PNG, WebP · max. 12 MB</em>
+      </button>
+    </div>
+
+    <div style="display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:16px;align-items:start;margin-top:22px">
       <div>
         <div class="section-title">Aufgaben (${relTasks.length})</div>
         <div class="card">${relTasks.length ? relTasks.map((t) => `
@@ -1023,6 +1152,63 @@ function viewProperty(root) {
       </div>
     </div>
   </div></div>`;
+
+  wirePhotoDrop(p.id);
+}
+
+/* Dateien direkt auf die Galerie ziehen */
+function wirePhotoDrop(propertyId) {
+  const zone = $('#photo-drop');
+  if (!zone) return;
+  let depth = 0;
+  const hasFiles = (e) => e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files');
+  zone.addEventListener('dragenter', (e) => {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    depth++;
+    zone.classList.add('drop-over');
+  });
+  zone.addEventListener('dragover', (e) => { if (hasFiles(e)) e.preventDefault(); });
+  zone.addEventListener('dragleave', () => {
+    depth = Math.max(0, depth - 1);
+    if (!depth) zone.classList.remove('drop-over');
+  });
+  zone.addEventListener('drop', (e) => {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    depth = 0;
+    zone.classList.remove('drop-over');
+    uploadPhotos(propertyId, e.dataTransfer.files);
+  });
+}
+
+/* Vollbildanzeige */
+function photoLightbox(id) {
+  const photo = byId(S.photos, id);
+  if (!photo) return '';
+  const siblings = propertyPhotos(photo.property_id);
+  const idx = siblings.findIndex((s) => s.id === id);
+  const property = propertyById(photo.property_id);
+  return `<div class="scrim" data-act="close-layer"></div>
+  <div class="lightbox">
+    <div class="lightbox-bar">
+      <div style="min-width:0">
+        <div class="bold trunc">${esc(photo.filename || 'Foto')}</div>
+        <div class="tiny" style="opacity:.72">${esc(property ? property.title : '')} · ${idx + 1} von ${siblings.length}${photo.size ? ' · ' + NUM.format(Math.round(photo.size / 1024)) + ' kB' : ''}</div>
+      </div>
+      <div class="row" style="gap:6px;margin-left:auto">
+        ${photo.is_cover ? '<span class="badge green dot">Titelbild</span>'
+          : `<button class="btn btn-ghost btn-sm" data-act="photo-cover" data-id="${esc(photo.id)}">${I.star} Als Titelbild</button>`}
+        <button class="btn btn-ghost btn-sm btn-icon" data-act="photo-delete" data-id="${esc(photo.id)}">${I.trash}</button>
+        <button class="btn btn-ghost btn-sm btn-icon" data-act="close-layer">${I.x}</button>
+      </div>
+    </div>
+    <div class="lightbox-stage">
+      ${siblings.length > 1 ? `<button class="lightbox-nav" data-act="photo-open" data-id="${esc(siblings[(idx - 1 + siblings.length) % siblings.length].id)}">‹</button>` : '<span></span>'}
+      <img src="/media/${esc(photo.key)}" alt="${esc(photo.filename || 'Foto')}">
+      ${siblings.length > 1 ? `<button class="lightbox-nav" data-act="photo-open" data-id="${esc(siblings[(idx + 1) % siblings.length].id)}">›</button>` : '<span></span>'}
+    </div>
+  </div>`;
 }
 
 /* ===================================================== Ansicht: Kontakte */
@@ -1424,7 +1610,10 @@ function renderLayer() {
   const layer = $('#layer');
   let html = '';
   if (paletteOpen) html = paletteHtml();
-  else if (modalConfig) html = modalHtml(modalConfig);
+  else if (S.lightbox) {
+    html = photoLightbox(S.lightbox);
+    if (!html) S.lightbox = null;
+  } else if (modalConfig) html = modalHtml(modalConfig);
   else if (S.drawerTask) {
     const t = byId(S.tasks, S.drawerTask);
     if (t) html = taskDrawer(t); else S.drawerTask = null;
@@ -1776,7 +1965,7 @@ function actPropertyModal(id) {
       { name: 'asking_price', label: 'Angebotspreis (€)', type: 'number', step: '1000', value: p?.asking_price },
       { name: 'rent_cold', label: 'Kaltmiete (€/Mon.)', type: 'number', step: '10', value: p?.rent_cold },
       { name: 'service_charge', label: 'Hausgeld (€/Mon.)', type: 'number', step: '10', value: p?.service_charge },
-      { name: 'image_url', label: 'Bild-URL', span: true, value: p?.image_url, placeholder: 'https://…' },
+      { name: 'image_url', label: 'Titelbild-URL (extern, optional — sonst Fotos hochladen)', span: true, value: p?.image_url, placeholder: 'https://…' },
       { name: 'notes', label: 'Notizen', type: 'textarea', span: true, value: p?.notes },
     ],
     onDelete: p ? async () => {
@@ -1943,7 +2132,7 @@ const ACTIONS = {
     paletteOpen = false; renderLayer();
     if (item) item.run();
   },
-  'close-layer': () => { modalConfig = null; S.drawerTask = null; S.menuOpen = null; renderLayer(); },
+  'close-layer': () => { modalConfig = null; S.drawerTask = null; S.menuOpen = null; S.lightbox = null; renderLayer(); },
 
   'board-view': (el) => { S.boardView = el.dataset.view; renderView(); },
   'f-mine': () => { S.filters.mine = !S.filters.mine; renderView(true); },
@@ -2042,6 +2231,23 @@ const ACTIONS = {
 
   'column-new': (el) => { S.menuOpen = null; actColumnModal(null, el.dataset.id); },
   'column-edit': (el) => actColumnModal(el.dataset.id),
+
+  'photo-pick': (el) => pickPhotos(el.dataset.id),
+  'photo-open': (el) => { S.lightbox = el.dataset.id; renderLayer(); },
+  'photo-cover': async (el) => {
+    await guard(async () => {
+      await api('/photos/' + el.dataset.id, 'PATCH', { is_cover: 1 });
+      await refresh(); renderView(true); renderLayer();
+    }, 'Titelbild gesetzt.');
+  },
+  'photo-delete': async (el) => {
+    if (!confirm('Foto wirklich löschen?')) return;
+    await guard(async () => {
+      await api('/photos/' + el.dataset.id, 'DELETE');
+      S.lightbox = null;
+      await refresh(); render();
+    }, 'Foto gelöscht.');
+  },
 
   'property-new': () => actPropertyModal(),
   'property-open': (el) => go('objekt/' + el.dataset.id),
@@ -2145,8 +2351,20 @@ document.addEventListener('keydown', (ev) => {
     if (ev.key === 'Escape') { paletteOpen = false; renderLayer(); }
     return;
   }
+  if (S.lightbox && (ev.key === 'ArrowLeft' || ev.key === 'ArrowRight')) {
+    const cur = byId(S.photos, S.lightbox);
+    const sib = cur ? propertyPhotos(cur.property_id) : [];
+    if (sib.length > 1) {
+      const i = sib.findIndex((x) => x.id === S.lightbox);
+      const next = ev.key === 'ArrowRight' ? (i + 1) % sib.length : (i - 1 + sib.length) % sib.length;
+      S.lightbox = sib[next].id;
+      renderLayer();
+    }
+    ev.preventDefault();
+    return;
+  }
   if (ev.key === 'Escape') {
-    if (modalConfig || S.drawerTask || S.menuOpen) { modalConfig = null; S.drawerTask = null; S.menuOpen = null; renderLayer(); render(); }
+    if (modalConfig || S.drawerTask || S.menuOpen || S.lightbox) { modalConfig = null; S.drawerTask = null; S.menuOpen = null; S.lightbox = null; renderLayer(); render(); }
     return;
   }
   const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(ev.target.tagName);

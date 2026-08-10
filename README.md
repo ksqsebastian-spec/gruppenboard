@@ -3,7 +3,8 @@
 Interne Projekt- und Objektsteuerung für die Immobilienverwaltung — Kanban-Board,
 Objektstammdaten, Kontakte, Termine und Auswertungen an einem Ort.
 
-Läuft als **ein einziger Cloudflare Worker** mit **D1** als Datenbank.
+Läuft als **ein einziger Cloudflare Worker** mit **D1** als Datenbank und
+**R2** für Objektfotos.
 Kein Build-Tooling, keine Laufzeit-Abhängigkeiten, kein externes CDN: HTML, CSS
 und JavaScript werden beim Build in den Worker eingebettet und in einer Antwort
 ausgeliefert.
@@ -32,6 +33,12 @@ Energieklasse), Preise, Kaltmiete, automatisch berechnete Bruttorendite,
 Statuspipeline (Ankauf → Bestand → Vermarktung → Verkauft/Vermietet),
 verknüpfte Aufgaben, Projekte, Kontakte, Termine und Dokumente
 
+**Fotogalerie mit R2** — Bilder per Dateidialog oder Drag & Drop hochladen
+(JPEG, PNG, WebP, GIF, AVIF, HEIC; bis 12 MB), Titelbild festlegen,
+Vollbildansicht mit Pfeiltastennavigation. Bilder liegen im R2-Bucket
+`mikdaten-media` und werden nur an angemeldete Personen ausgeliefert; beim
+Löschen eines Objekts werden sie mit entfernt
+
 **Kontakte** — nach Rolle gruppiert: Eigentümer, Käufer, Mieter, Interessent,
 Makler, Handwerker, Notar, Bank, Hausverwaltung, Behörde
 
@@ -46,6 +53,11 @@ Teamauslastung, 14-Tage-Verlauf, nächste Termine, Aktivitätsprotokoll
 **Weiteres** — Team-Übersicht mit Auslastung, Aktivitätsverlauf, Befehlspalette
 (⌘K / Strg+K), helles und dunkles Design, Tastaturkürzel (`n` neue Aufgabe,
 `g`+`d`/`m`/`o`/`k` zum Springen), vollständig responsiv bis 390 px.
+
+## Datenbestand
+
+Die Datenbank startet **leer** — nur die drei Konten sind angelegt. Beim ersten
+Login führt eine Startseite durch die ersten Schritte.
 
 ## Zugang
 
@@ -74,6 +86,9 @@ werden alle bestehenden Sitzungen dieser Person beendet.
   öffentliche Benutzerfelder
 - Alle SQL-Zugriffe über gebundene Parameter; Schreibfelder sind je Tabelle
   auf eine Positivliste beschränkt
+- Bilder in R2 sind nicht öffentlich: `/media/*` verlangt eine gültige Sitzung
+  und prüft den Pfad gegen Traversal; Uploads werden auf Bildtypen und 12 MB
+  begrenzt
 - Die Seite ist per `robots`-Meta von der Indexierung ausgenommen
 
 ## Aufbau
@@ -87,22 +102,23 @@ schema.sql           Datenbankschema
 seed.sql             Erzeugt aus scripts/gen-seed.mjs (Konten + Beispieldaten)
 scripts/build.mjs    Bettet HTML/CSS/JS in dist/worker.js ein
 scripts/gen-seed.mjs Erzeugt seed.sql inkl. Passwort-Hashes
-scripts/local-test.mjs   50 Integrationstests gegen node:sqlite
+scripts/local-test.mjs   77 Integrationstests gegen node:sqlite und R2-Attrappe
 scripts/local-server.mjs Lokaler Server auf Port 8788
 ```
 
 ## Entwicklung
 
 ```bash
-npm run test    # Build + 50 Integrationstests (node:sqlite als D1-Ersatz)
+npm run test    # Build + 77 Integrationstests (node:sqlite als D1-Ersatz)
 npm run dev     # http://127.0.0.1:8788, Daten im Arbeitsspeicher
 npm run build   # dist/worker.js erzeugen
 ```
 
 ## Deployment
 
-Vorhanden sind bereits der Worker `mikdaten` und die D1-Datenbank `mikdaten`
-(`995b2b67-7dda-4a12-89be-bd34950ee794`) im Cloudflare-Konto.
+Vorhanden sind bereits der Worker `mikdaten`, die D1-Datenbank `mikdaten`
+(`995b2b67-7dda-4a12-89be-bd34950ee794`) und der R2-Bucket `mikdaten-media`
+im Cloudflare-Konto.
 
 ```bash
 npm run build
@@ -112,9 +128,13 @@ npx wrangler deploy
 Datenbank neu aufsetzen (**löscht alle Daten**):
 
 ```bash
-node scripts/gen-seed.mjs "<Startpasswort>" > seed.sql
+# nur die drei Konten, keine Beispieldaten (so läuft die Produktivumgebung)
+node scripts/gen-seed.mjs "<Startpasswort>" --users-only > seed.sql
 npm run db:schema
 npm run db:seed
+
+# alternativ mit Beispieldaten zum Ausprobieren
+node scripts/gen-seed.mjs "<Startpasswort>" > seed.sql
 ```
 
 ## API
@@ -136,4 +156,7 @@ Schreibende Anfragen brauchen `X-Mikdaten: 1`.
 | POST/PATCH/DELETE | `/contacts[/:id]` | Kontakte |
 | POST/PATCH/DELETE | `/events[/:id]` | Termine |
 | POST/DELETE | `/documents[/:id]` | Dokumentlinks |
+| POST | `/photos/upload?property_id=…` | Bild-Upload nach R2 (Rohdaten im Body) |
+| PATCH/DELETE | `/photos/:id` | Titelbild setzen, Bildunterschrift, Löschen |
+| GET | `/media/<key>` (ohne `/api`) | Bildauslieferung, nur mit Sitzung |
 | GET | `/healthz` | Statusprüfung (ohne Anmeldung) |

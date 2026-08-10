@@ -1,6 +1,7 @@
 -- Mikdaten · Datenbankschema (Cloudflare D1 / SQLite)
 
 DROP TABLE IF EXISTS activity;
+DROP TABLE IF EXISTS photos;
 DROP TABLE IF EXISTS documents;
 DROP TABLE IF EXISTS events;
 DROP TABLE IF EXISTS checklist_items;
@@ -189,6 +190,21 @@ CREATE TABLE documents (
   user_id     TEXT REFERENCES users(id) ON DELETE SET NULL,
   created_at  TEXT NOT NULL
 );
+
+CREATE TABLE photos (
+  id           TEXT PRIMARY KEY,
+  property_id  TEXT NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+  key          TEXT NOT NULL,
+  filename     TEXT,
+  content_type TEXT,
+  size         INTEGER,
+  caption      TEXT,
+  is_cover     INTEGER NOT NULL DEFAULT 0,
+  position     INTEGER NOT NULL DEFAULT 0,
+  user_id      TEXT REFERENCES users(id) ON DELETE SET NULL,
+  created_at   TEXT NOT NULL
+);
+CREATE INDEX idx_photos_property ON photos(property_id);
 
 CREATE TABLE activity (
   id          TEXT PRIMARY KEY,

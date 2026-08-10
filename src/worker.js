@@ -152,7 +152,7 @@ const publicUser = (u) => ({
 
 async function loadState(db) {
   const q = (sql) => db.prepare(sql).all();
-  const [users, projects, members, columns, tasks, comments, checklist, properties, contacts, events, documents, activity] =
+  const [users, projects, members, columns, tasks, comments, checklist, properties, contacts, events, documents, photos, activity] =
     await Promise.all([
       q('SELECT * FROM users ORDER BY name'),
       q('SELECT * FROM projects ORDER BY archived, position, created_at'),
@@ -165,6 +165,7 @@ async function loadState(db) {
       q('SELECT * FROM contacts ORDER BY name'),
       q('SELECT * FROM events ORDER BY date, time'),
       q('SELECT * FROM documents ORDER BY created_at DESC'),
+      q('SELECT * FROM photos ORDER BY position, created_at'),
       q('SELECT * FROM activity ORDER BY created_at DESC LIMIT 120'),
     ]);
 
@@ -180,6 +181,7 @@ async function loadState(db) {
     contacts: contacts.results,
     events: events.results,
     documents: documents.results,
+    photos: photos.results,
     activity: activity.results,
   };
 }
@@ -233,11 +235,24 @@ const PROPERTY_FIELDS = [
 const CONTACT_FIELDS = ['name', 'role', 'company', 'email', 'phone', 'street', 'zip', 'city', 'property_id', 'notes'];
 const EVENT_FIELDS = ['title', 'type', 'date', 'time', 'duration', 'location', 'project_id', 'property_id', 'contact_id', 'owner_id', 'notes'];
 
+const IMAGE_TYPES = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+  'image/gif': 'gif',
+  'image/avif': 'avif',
+  'image/heic': 'heic',
+};
+const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
+
 async function handleApi(request, env, url) {
   const db = env.DB;
   const path = url.pathname.replace(/^\/api/, '');
   const method = request.method.toUpperCase();
-  const body = method === 'GET' || method === 'DELETE' ? {} : await request.json().catch(() => ({}));
+  const isBinary = path === '/photos/upload';
+  const body = method === 'GET' || method === 'DELETE' || isBinary
+    ? {}
+    : await request.json().catch(() => ({}));
 
   /* --- öffentlich --- */
   if (path === '/auth/login' && method === 'POST') {
@@ -528,7 +543,84 @@ async function handleApi(request, env, url) {
       return json({ ok: true });
     }
     if (method === 'DELETE') {
+      const shots = await db.prepare('SELECT key FROM photos WHERE property_id = ?').bind(m[1]).all();
+      if (env.MEDIA) for (const s of shots.results) await env.MEDIA.delete(s.key);
       await db.prepare('DELETE FROM properties WHERE id = ?').bind(m[1]).run();
+      return json({ ok: true });
+    }
+  }
+
+  /* --- Fotos (R2) --- */
+  if (path === '/photos/upload' && method === 'POST') {
+    if (!env.MEDIA) return fail(500, 'Bildspeicher ist nicht verbunden.');
+    const propertyId = url.searchParams.get('property_id');
+    const property = propertyId
+      ? await db.prepare('SELECT id, image_url FROM properties WHERE id = ?').bind(propertyId).first()
+      : null;
+    if (!property) return fail(400, 'Unbekanntes Objekt.');
+
+    const type = (request.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
+    const ext = IMAGE_TYPES[type];
+    if (!ext) return fail(415, 'Nur JPEG, PNG, WebP, GIF, AVIF oder HEIC sind erlaubt.');
+
+    const bytes = await request.arrayBuffer();
+    if (!bytes.byteLength) return fail(400, 'Die Datei ist leer.');
+    if (bytes.byteLength > MAX_IMAGE_BYTES) return fail(413, 'Das Bild ist größer als 12 MB.');
+
+    let filename = 'Foto';
+    try { filename = decodeURIComponent(request.headers.get('x-filename') || '').slice(0, 180) || 'Foto'; } catch { /* Standard */ }
+
+    const id = uid('pho');
+    const key = `objekte/${propertyId}/${id}.${ext}`;
+    await env.MEDIA.put(key, bytes, {
+      httpMetadata: { contentType: type, cacheControl: 'private, max-age=31536000, immutable' },
+      customMetadata: { propertyId, uploadedBy: me.id },
+    });
+
+    const max = await db.prepare('SELECT COALESCE(MAX(position), -1) AS p, COUNT(*) AS c FROM photos WHERE property_id = ?')
+      .bind(propertyId).first();
+    const first = (max?.c ?? 0) === 0;
+    await insertRow(db, 'photos', {
+      id, property_id: propertyId, key, filename, content_type: type,
+      size: bytes.byteLength, caption: null, is_cover: first ? 1 : 0,
+      position: (max?.p ?? -1) + 1, user_id: me.id, created_at: nowIso(),
+    });
+    if (first || !property.image_url) {
+      await updateRow(db, 'properties', propertyId, { image_url: `/media/${key}`, updated_at: nowIso() });
+    }
+    await logActivity(db, me, 'upload', 'photo', id, `Foto zu Objekt hochgeladen: ${filename}`);
+    return json({ ok: true, id, url: `/media/${key}` });
+  }
+
+  if ((m = path.match(/^\/photos\/([\w-]+)$/))) {
+    const photo = await db.prepare('SELECT * FROM photos WHERE id = ?').bind(m[1]).first();
+    if (!photo) return fail(404, 'Foto nicht gefunden.');
+
+    if (method === 'PATCH') {
+      if (body.is_cover) {
+        await db.prepare('UPDATE photos SET is_cover = 0 WHERE property_id = ?').bind(photo.property_id).run();
+        await db.prepare('UPDATE photos SET is_cover = 1 WHERE id = ?').bind(photo.id).run();
+        await updateRow(db, 'properties', photo.property_id, { image_url: `/media/${photo.key}`, updated_at: nowIso() });
+      }
+      if (Object.prototype.hasOwnProperty.call(body, 'caption')) {
+        await updateRow(db, 'photos', photo.id, { caption: body.caption || null });
+      }
+      return json({ ok: true });
+    }
+
+    if (method === 'DELETE') {
+      if (env.MEDIA) await env.MEDIA.delete(photo.key);
+      await db.prepare('DELETE FROM photos WHERE id = ?').bind(photo.id).run();
+      if (photo.is_cover) {
+        const next = await db.prepare('SELECT * FROM photos WHERE property_id = ? ORDER BY position LIMIT 1')
+          .bind(photo.property_id).first();
+        if (next) {
+          await db.prepare('UPDATE photos SET is_cover = 1 WHERE id = ?').bind(next.id).run();
+          await updateRow(db, 'properties', photo.property_id, { image_url: `/media/${next.key}` });
+        } else {
+          await updateRow(db, 'properties', photo.property_id, { image_url: null });
+        }
+      }
       return json({ ok: true });
     }
   }
@@ -633,6 +725,30 @@ export default {
     }
 
     if (url.pathname === '/healthz') return json({ ok: true, ts: nowIso() });
+
+    // Bilder aus R2 — nur für angemeldete Personen
+    if (url.pathname.startsWith('/media/')) {
+      if (!env.MEDIA || !env.DB) return new Response('Bildspeicher nicht verbunden', { status: 500 });
+      const me = await authenticate(request, env.DB).catch(() => null);
+      if (!me) return new Response('Nicht angemeldet', { status: 401 });
+
+      const key = decodeURIComponent(url.pathname.slice('/media/'.length));
+      if (!key || key.includes('..')) return new Response('Ungültiger Pfad', { status: 400 });
+
+      const object = await env.MEDIA.get(key);
+      if (!object) return new Response('Nicht gefunden', { status: 404 });
+
+      const headers = new Headers();
+      object.writeHttpMetadata(headers);
+      headers.set('etag', object.httpEtag);
+      headers.set('cache-control', 'private, max-age=31536000, immutable');
+      headers.set('content-disposition', 'inline');
+      headers.set('x-content-type-options', 'nosniff');
+      if (request.headers.get('if-none-match') === object.httpEtag) {
+        return new Response(null, { status: 304, headers });
+      }
+      return new Response(object.body, { headers });
+    }
 
     return new Response(APP_HTML, {
       headers: {
