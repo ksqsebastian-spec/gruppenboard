@@ -682,6 +682,28 @@ check('Verbindung getrennt', r.status === 200, r.status);
 m = await rpc('tools/list', {}, token);
 check('Getrennter Token wirkt sofort', m.status === 401, m.status);
 
+// Bildmarke
+console.log('\n  — Bildmarke —');
+const iconCheck = async (path, type, magic) => {
+  const res = await raw(path);
+  const buf = Buffer.from(await res.arrayBuffer());
+  const ok = res.status === 200
+    && (res.headers.get('content-type') || '').startsWith(type)
+    && buf.subarray(0, magic.length).equals(Buffer.from(magic));
+  check(`${path} liefert ${type}`, ok, `${res.status} ${res.headers.get('content-type')} ${buf.length} B`);
+  return buf;
+};
+const PNG_MAGIC = [0x89, 0x50, 0x4e, 0x47];
+await iconCheck('/favicon.ico', 'image/x-icon', [0x00, 0x00, 0x01, 0x00]);
+await iconCheck('/icon.png', 'image/png', PNG_MAGIC);
+await iconCheck('/apple-touch-icon.png', 'image/png', PNG_MAGIC);
+r = await call('/favicon.svg');
+check('/favicon.svg liefert SVG', r.status === 200 && r.text.startsWith('<svg'), r.status);
+const noAuth = await raw('/favicon.ico');
+check('Bildmarke ohne Anmeldung erreichbar', noAuth.status === 200, noAuth.status);
+m = await rpc('initialize', {});
+check('Handshake nennt das Icon', m.json.result.serverInfo.icons?.[0]?.src === 'https://x.dev/icon.png', m.json.result.serverInfo);
+
 // Health
 r = await call('/healthz');
 check('Healthcheck', r.status === 200 && r.json.ok === true);

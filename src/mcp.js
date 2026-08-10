@@ -1202,7 +1202,18 @@ async function handleMcp(request, env, url, origin) {
     return rpcResult(id, {
       protocolVersion: MCP_PROTOCOL,
       capabilities: { tools: { listChanged: false }, resources: { listChanged: false }, prompts: { listChanged: false } },
-      serverInfo: { name: MCP_NAME, title: 'Mikdaten', version: MCP_VERSION },
+      serverInfo: {
+        name: MCP_NAME,
+        title: 'Mikdaten',
+        version: MCP_VERSION,
+        websiteUrl: origin,
+        // Neuere Clients lesen das Icon hier ab, ältere holen sich das Favicon.
+        // Beides zeigt auf dieselbe Bildmarke, deshalb schadet die Doppelung nicht.
+        icons: [
+          { src: `${origin}/icon.png`, mimeType: 'image/png', sizes: ['512x512'] },
+          { src: `${origin}/icon.svg`, mimeType: 'image/svg+xml', sizes: ['any'] },
+        ],
+      },
       instructions: 'Projekt- und Objektsteuerung einer Immobilienverwaltung. '
         + 'Bei allgemeinen Fragen zuerst „uebersicht" aufrufen. Spalten-IDs zum Verschieben von Aufgaben '
         + 'liefert „projekt_details". Personen dürfen als Name, Benutzername oder ID angegeben werden. '

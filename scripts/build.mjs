@@ -17,8 +17,10 @@ const html = read('src/index.html')
   .replace('__APP_JS__', () => js);
 
 const mcp = read('src/mcp.js');
+const icons = read('src/icons.js');
 
 const worker = read('src/worker.js')
+  .replace('__ICONS__', () => icons)
   .replace('__MCP_MODULE__', () => mcp)
   .replace('__APP_HTML__', () => JSON.stringify(html));
 

@@ -269,6 +269,28 @@ const IMAGE_TYPES = {
 };
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
 
+/* ------------------------------------------------------------------ Icons */
+__ICONS__
+
+/* Base64 einmal beim Kaltstart auspacken, danach aus dem Speicher ausliefern. */
+const ICON_CACHE = {};
+function iconBytes(b64) {
+  if (ICON_CACHE[b64]) return ICON_CACHE[b64];
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  ICON_CACHE[b64] = bytes;
+  return bytes;
+}
+
+const iconResponse = (b64, type) => new Response(iconBytes(b64), {
+  headers: {
+    'content-type': type,
+    'cache-control': 'public, max-age=86400',
+    'access-control-allow-origin': '*',
+  },
+});
+
 /* ------------------------------------------------------------- MCP-Server */
 __MCP_MODULE__
 
@@ -829,6 +851,22 @@ export default {
     }
 
     if (url.pathname === '/healthz') return json({ ok: true, ts: nowIso() });
+
+    /* --- Bildmarke. Ohne Anmeldung, sonst bleibt jede Icon-Anzeige leer. --- */
+    if (url.pathname === '/favicon.ico') return iconResponse(ICON_ICO, 'image/x-icon');
+    if (url.pathname === '/icon.png') return iconResponse(ICON_PNG_512, 'image/png');
+    if (url.pathname === '/apple-touch-icon.png' || url.pathname === '/apple-touch-icon-precomposed.png') {
+      return iconResponse(ICON_PNG_180, 'image/png');
+    }
+    if (url.pathname === '/favicon.svg' || url.pathname === '/icon.svg') {
+      return new Response(LOGO_SVG, {
+        headers: {
+          'content-type': 'image/svg+xml; charset=utf-8',
+          'cache-control': 'public, max-age=86400',
+          'access-control-allow-origin': '*',
+        },
+      });
+    }
 
     /* --- MCP-Server (läuft in diesem Worker) --- */
     const origin = url.origin;

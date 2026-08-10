@@ -167,18 +167,20 @@ src/styles.css       Design-System (Tokens, Komponenten, helles/dunkles Design)
 src/app.js           Single-Page-Anwendung (Vanilla JS, keine Abhängigkeiten)
 src/pixel-avatars.js Zwölf Pixel-Tiere und die Bildmarke als Pixelraster
 src/mcp.js           MCP-Server: Werkzeuge, Ressourcen, Prompts, OAuth 2.1
+src/icons.js         Erzeugt von gen-icons.mjs: Bildmarke als PNG und ICO
 schema.sql           Datenbankschema
 seed.sql             Erzeugt aus scripts/gen-seed.mjs (Konten + Beispieldaten)
 scripts/build.mjs    Bettet HTML/CSS/JS in dist/worker.js ein
 scripts/gen-seed.mjs Erzeugt seed.sql inkl. Passwort-Hashes
-scripts/local-test.mjs   169 Integrationstests gegen node:sqlite und R2-Attrappe
+scripts/gen-icons.mjs Rastert die Bildmarke zu PNG und ICO
+scripts/local-test.mjs   175 Integrationstests gegen node:sqlite und R2-Attrappe
 scripts/local-server.mjs Lokaler Server auf Port 8788
 ```
 
 ## Entwicklung
 
 ```bash
-npm run test    # Build + 169 Integrationstests (node:sqlite als D1-Ersatz)
+npm run test    # Build + 175 Integrationstests (node:sqlite als D1-Ersatz)
 npm run dev     # http://127.0.0.1:8788, Daten im Arbeitsspeicher
 npm run build   # dist/worker.js erzeugen
 ```
@@ -230,6 +232,7 @@ Schreibende Anfragen brauchen `X-Mikdaten: 1`.
 | PATCH/DELETE | `/photos/:id` | Titelbild setzen, Bildunterschrift, Löschen |
 | GET | `/media/<key>` (ohne `/api`) | Bild- und Dateiauslieferung, nur mit Sitzung; `?dl=1` erzwingt den Download |
 | GET/DELETE | `/mcp/tokens[/:id]` | Verbundene MCP-Anwendungen anzeigen und trennen |
+| GET | `/favicon.ico` · `/icon.png` · `/apple-touch-icon.png` · `/favicon.svg` | Bildmarke, ohne Anmeldung |
 | GET | `/healthz` | Statusprüfung (ohne Anmeldung) |
 
 ## MCP
