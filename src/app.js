@@ -85,6 +85,9 @@ const I = {
   euro: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 5.5A6.5 6.5 0 0 0 7.5 12 6.5 6.5 0 0 0 17 18.5M4 10.5h8M4 14h8"/></svg>',
   ruler: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="8" width="19" height="8" rx="2"/><path d="M7 8v3M11 8v4M15 8v3M19 8v4"/></svg>',
   bed: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18v-8M3 13h18v5M21 18v-3.5A2.5 2.5 0 0 0 18.5 12H12V8.5"/><circle cx="7" cy="9.5" r="1.8"/></svg>',
+  chevron: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5 8 12l7 7"/></svg>',
+  arrowLeft: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 4 12l7 7M4 12h16"/></svg>',
+  arrowRight: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m13 5 7 7-7 7M20 12H4"/></svg>',
   camera: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5A2.5 2.5 0 0 1 5.5 6h1.9a1 1 0 0 0 .83-.45l.9-1.35A1 1 0 0 1 9.96 3.8h4.08a1 1 0 0 1 .83.4l.9 1.35a1 1 0 0 0 .83.45h1.9A2.5 2.5 0 0 1 21 8.5v9A2.5 2.5 0 0 1 18.5 20h-13A2.5 2.5 0 0 1 3 17.5z"/><circle cx="12" cy="12.8" r="3.6"/></svg>',
   star: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3.8 2.6 5.3 5.9.85-4.25 4.15 1 5.85L12 17.2l-5.25 2.75 1-5.85L3.5 9.95l5.9-.85z"/></svg>',
   pin: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-5.7 7-11a7 7 0 1 0-14 0c0 5.3 7 11 7 11z"/><circle cx="12" cy="10" r="2.4"/></svg>',
@@ -147,7 +150,6 @@ const EVENT_TYPES = [
 const EVENT_TYPE_NAME = Object.fromEntries(EVENT_TYPES);
 
 const COLORS = ['#FF4E5B', '#FF8A3D', '#F5B301', '#12855F', '#0E8A8A', '#2F6DF6', '#7A4DDB', '#E2569C', '#5B6472', '#7C6A55'];
-const EMOJIS = ['🏠', '🏢', '🏗️', '🔑', '📐', '💼', '📄', '🧱', '🌳', '⚡'];
 
 /* ------------------------------------------------------------------ State */
 
@@ -162,6 +164,11 @@ const S = {
   drawerTask: null,
   menuOpen: null,
   lightbox: null,
+  groupBy: '',
+  composer: null,
+  collapsed: new Set(),
+  collapsedFor: null,
+  showAllDone: new Set(),
 };
 
 const byId = (arr, id) => arr.find((x) => x.id === id) || null;
@@ -391,10 +398,10 @@ function renderTopbar() {
 
   if (r.name === 'board') {
     const p = projectById(r.id);
-    title = p ? `${p.emoji || '🏠'} ${p.name}` : 'Projekt';
+    title = p ? p.name : 'Projekt';
     const prog = p ? progressOf(p.id) : { done: 0, total: 0, pct: 0 };
     right = `
-      <div class="row" style="gap:9px;margin-right:2px">
+      <div class="row tb-progress" style="gap:9px;margin-right:2px">
         <span class="tiny faint">${prog.done}/${prog.total} erledigt</span>
         <div class="bar" style="width:84px"><i style="width:${prog.pct}%"></i></div>
       </div>
@@ -443,7 +450,11 @@ function filteredTasks(pid) {
   const f = S.filters;
   const q = f.q.trim().toLowerCase();
   return projectTasks(pid).filter((t) => {
-    if (q && !(`${t.title} ${t.description || ''}`.toLowerCase().includes(q))) return false;
+    if (q) {
+      const prop = propertyById(t.property_id);
+      const hay = `${t.title} ${t.description || ''} ${(t.labels || []).join(' ')} ${prop ? prop.title : ''}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
     if (f.assignee && t.assignee_id !== f.assignee) return false;
     if (f.priority && t.priority !== f.priority) return false;
     if (f.label && !(t.labels || []).includes(f.label)) return false;
@@ -453,39 +464,176 @@ function filteredTasks(pid) {
   });
 }
 
+const filtersActive = () => {
+  const f = S.filters;
+  return !!(f.assignee || f.priority || f.label || f.q.trim() || f.mine || f.overdue);
+};
+
 function taskCard(t) {
   const u = userById(t.assignee_id);
   const done = isDoneTask(t);
   const cl = S.checklist.filter((c) => c.task_id === t.id);
   const clDone = cl.filter((c) => c.done).length;
   const nComments = S.comments.filter((c) => c.task_id === t.id).length;
+  const nDocs = S.documents.filter((d) => d.task_id === t.id).length;
   const prop = propertyById(t.property_id);
   const labels = t.labels || [];
 
-  return `<article class="tcard ${done ? 'done' : ''}" data-task="${esc(t.id)}" data-act="task-open">
+  return `<article class="tcard ${done ? 'done' : ''}" data-task="${esc(t.id)}" data-act="task-open" tabindex="0">
     <span class="tcard-handle" title="Zum Verschieben ziehen">${I.drag}</span>
-    ${labels.length ? `<div class="tcard-labels">${labels.map((l) => `<i class="tlabel" style="background:${esc(LABEL_COLOR[l] || '#9aa0ab')}" title="${esc(l)}"></i>`).join('')}</div>` : ''}
+    ${labels.length ? `<div class="tcard-labels">${labels.map((l) => `<span class="tlabel" style="background:${hexA(LABEL_COLOR[l] || '#9aa0ab', 0.14)};color:${esc(LABEL_COLOR[l] || '#9aa0ab')}">${esc(l)}</span>`).join('')}</div>` : ''}
     <div class="tcard-title">${esc(t.title)}</div>
-    ${prop ? `<div class="tiny faint row" style="margin-top:6px;gap:4px">${I.pin}<span class="trunc">${esc(prop.title)}</span></div>` : ''}
+    ${prop ? `<div class="tcard-obj">${I.pin}<span class="trunc">${esc(prop.title)}</span></div>` : ''}
     <div class="tcard-meta">
       <span class="prio ${esc(t.priority)}" title="Priorität ${esc(PRIO_NAME[t.priority] || '')}"></span>
       ${dueBadge(t.due_date, done)}
-      ${cl.length ? `<span class="m">${I.checkSquare}${clDone}/${cl.length}</span>` : ''}
+      ${cl.length ? `<span class="m ${clDone === cl.length ? 'ok' : ''}">${I.checkSquare}${clDone}/${cl.length}</span>` : ''}
       ${nComments ? `<span class="m">${I.chat}${nComments}</span>` : ''}
+      ${nDocs ? `<span class="m">${I.doc}${nDocs}</span>` : ''}
       ${t.amount ? `<span class="m">${I.euro}${esc(EUR.format(t.amount))}</span>` : ''}
       <span class="push">${avatar(u, 'sm')}</span>
     </div>
   </article>`;
 }
 
+/* --------------------------------------------------------- Board-Werkzeug */
+
+const GROUPINGS = [
+  ['', 'Keine Gruppierung'],
+  ['assignee_id', 'Nach Zuständigkeit'],
+  ['priority', 'Nach Priorität'],
+  ['property_id', 'Nach Objekt'],
+];
+
+const DONE_VISIBLE = 15;
+
+function collapsedKey(pid) { return `mk-collapsed-${pid}`; }
+
+function loadCollapsed(pid) {
+  try { return new Set(JSON.parse(localStorage.getItem(collapsedKey(pid)) || '[]')); }
+  catch { return new Set(); }
+}
+function saveCollapsed(pid) {
+  try { localStorage.setItem(collapsedKey(pid), JSON.stringify(Array.from(S.collapsed))); }
+  catch { /* egal */ }
+}
+
+/* Baut die Schwimmbahnen: ohne Gruppierung genau eine ohne Titel. */
+function buildLanes(tasks) {
+  const g = S.groupBy;
+  if (!g) return [{ key: '', label: '', tasks }];
+
+  const lanes = [];
+  const push = (key, label, meta) => lanes.push({ key, label, meta, tasks: [] });
+
+  if (g === 'assignee_id') {
+    S.users.forEach((u) => push(u.id, u.name, u));
+    push('', 'Nicht zugewiesen', null);
+  } else if (g === 'priority') {
+    PRIOS.forEach(([k, l]) => push(k, l, null));
+  } else {
+    const used = new Set(tasks.map((t) => t.property_id).filter(Boolean));
+    S.properties.filter((p) => used.has(p.id)).forEach((p) => push(p.id, p.title, null));
+    push('', 'Ohne Objekt', null);
+  }
+
+  const index = new Map(lanes.map((l) => [l.key, l]));
+  tasks.forEach((t) => {
+    const lane = index.get(t[g] || '') || index.get('');
+    if (lane) lane.tasks.push(t);
+  });
+  return lanes.filter((l) => l.tasks.length);
+}
+
+function columnHead(c, tasksOfColumn, collapsed) {
+  const over = c.wip_limit && tasksOfColumn.length > c.wip_limit;
+  const sum = tasksOfColumn.reduce((s, t) => s + (Number(t.amount) || 0), 0);
+  if (collapsed) {
+    return `<div class="col-head is-collapsed" data-column="${esc(c.id)}">
+      <button class="col-expand" data-act="column-collapse" data-id="${esc(c.id)}" title="${esc(c.title)} ausklappen">
+        <span class="col-vert">${esc(c.title)}</span><span class="n">${tasksOfColumn.length}</span>
+      </button>
+    </div>`;
+  }
+  return `<div class="col-head" data-column="${esc(c.id)}">
+    <button class="col-collapse" data-act="column-collapse" data-id="${esc(c.id)}" title="Einklappen">${I.chevron}</button>
+    <h3 class="trunc">${esc(c.title)}</h3>
+    <span class="n ${over ? 'over' : ''}" title="${c.wip_limit ? `WIP-Limit ${c.wip_limit}` : 'Anzahl Aufgaben'}">${tasksOfColumn.length}${c.wip_limit ? ' / ' + c.wip_limit : ''}</span>
+    ${sum ? `<span class="col-sum" title="Summe der Beträge">${esc(EUR.format(sum))}</span>` : ''}
+    <div class="col-tools">
+      <button data-act="composer-open" data-column="${esc(c.id)}" title="Aufgabe hinzufügen">${I.plus}</button>
+      <div class="dropdown">
+        <button data-act="menu" data-menu="col:${esc(c.id)}" title="Spalte">${I.dots}</button>
+        ${S.menuOpen === 'col:' + c.id ? `<div class="menu">
+          <button data-act="column-edit" data-id="${esc(c.id)}">${I.edit} Spalte bearbeiten</button>
+          <button data-act="column-move" data-id="${esc(c.id)}" data-dir="-1">${I.arrowLeft} Nach links</button>
+          <button data-act="column-move" data-id="${esc(c.id)}" data-dir="1">${I.arrowRight} Nach rechts</button>
+          <button data-act="column-collapse" data-id="${esc(c.id)}">${I.chevron} Einklappen</button>
+          <div class="sepm"></div>
+          <button class="danger" data-act="column-delete" data-id="${esc(c.id)}">${I.trash} Spalte löschen</button>
+        </div>` : ''}
+      </div>
+    </div>
+  </div>`;
+}
+
+function columnCards(c, laneKey, list) {
+  const isDoneCol = !!c.is_done;
+  let shown = list;
+  let hidden = 0;
+  if (isDoneCol && !S.showAllDone.has(c.id) && list.length > DONE_VISIBLE) {
+    shown = list.slice(0, DONE_VISIBLE);
+    hidden = list.length - DONE_VISIBLE;
+  }
+  const composerHere = S.composer && S.composer.column === c.id && S.composer.lane === laneKey;
+
+  return `<div class="col-drop" data-column="${esc(c.id)}">
+    <div class="col-cards" data-column-body="${esc(c.id)}" data-lane="${esc(laneKey)}">
+      ${shown.map(taskCard).join('')}
+      ${!shown.length && !composerHere ? '<div class="col-empty">Hierher ziehen</div>' : ''}
+      ${hidden ? `<button class="col-more" data-act="show-all-done" data-id="${esc(c.id)}">${hidden} ältere anzeigen</button>` : ''}
+    </div>
+    <div class="col-foot">
+      ${composerHere ? composerMarkup(c) : `<button class="add-card" data-act="composer-open" data-column="${esc(c.id)}" data-lane="${esc(laneKey)}">${I.plus} Aufgabe</button>`}
+    </div>
+  </div>`;
+}
+
+function composerMarkup(c) {
+  const d = S.composer;
+  return `<div class="composer">
+    <textarea id="composer-input" rows="2" placeholder="Titel der Aufgabe — Eingabe zum Anlegen">${esc(d.text || '')}</textarea>
+    <div class="composer-row">
+      <select class="select" id="composer-assignee" title="Zuständig">
+        <option value="">Niemand</option>
+        ${S.users.map((u) => `<option value="${esc(u.id)}" ${d.assignee === u.id ? 'selected' : ''}>${esc(u.name)}</option>`).join('')}
+      </select>
+      <select class="select" id="composer-prio" title="Priorität">
+        ${PRIOS.map(([k, l]) => `<option value="${k}" ${(d.priority || 'normal') === k ? 'selected' : ''}>${l}</option>`).join('')}
+      </select>
+      <input class="input" type="date" id="composer-due" value="${esc(d.due || '')}" title="Fällig">
+    </div>
+    <div class="composer-actions">
+      <button class="btn btn-brand btn-sm" data-act="composer-save" data-column="${esc(c.id)}">Anlegen</button>
+      <button class="btn btn-ghost btn-sm" data-act="composer-close">Abbrechen</button>
+    </div>
+  </div>`;
+}
+
+/* ------------------------------------------------------------ Ansicht */
+
 function viewBoard(root) {
   const p = projectById(S.route.id);
   if (!p) { root.innerHTML = emptyState('Projekt nicht gefunden', 'Wähle links ein Projekt aus.'); return; }
 
+  if (S.collapsedFor !== p.id) {
+    S.collapsed = loadCollapsed(p.id);
+    S.collapsedFor = p.id;
+  }
+
   const f = S.filters;
   const members = projectMembers(p.id);
-
-  const active = f.assignee || f.priority || f.label || f.q || f.mine || f.overdue;
+  const active = filtersActive();
 
   const toolbar = `
     <div class="toolbar">
@@ -493,71 +641,184 @@ function viewBoard(root) {
         ${[['board', 'Board', I.board], ['liste', 'Liste', I.list], ['timeline', 'Timeline', I.timeline], ['kalender', 'Kalender', I.calendar]]
           .map(([k, l, ic]) => `<button class="${S.boardView === k ? 'on' : ''}" data-act="board-view" data-view="${k}">${ic}<span>${l}</span></button>`).join('')}
       </div>
-      <div style="width:1px;height:22px;background:var(--line)"></div>
-      <div class="row" style="gap:6px;flex:1;min-width:160px;max-width:260px">
-        <div style="position:relative;flex:1">
-          <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--faint)">${I.search}</span>
-          <input class="input" id="board-search" placeholder="Aufgaben filtern" value="${esc(f.q)}" style="padding-left:31px;height:32px">
-        </div>
+      <div class="tb-sep"></div>
+      <div class="tb-search">
+        <span>${I.search}</span>
+        <input class="input" id="board-search" placeholder="Aufgaben filtern" value="${esc(f.q)}" autocomplete="off">
       </div>
       <button class="chip ${f.mine ? 'on' : ''}" data-act="f-mine">Nur meine</button>
       <button class="chip ${f.overdue ? 'on' : ''}" data-act="f-overdue">Überfällig</button>
-      <select class="select" data-change="f-prio" style="height:30px;padding:0 30px 0 10px;width:auto;border-radius:99px">
+      <select class="select tb-select" data-change="f-prio" title="Priorität">
         <option value="">Priorität</option>
         ${PRIOS.map(([k, l]) => `<option value="${k}" ${f.priority === k ? 'selected' : ''}>${l}</option>`).join('')}
       </select>
-      <select class="select" data-change="f-label" style="height:30px;padding:0 30px 0 10px;width:auto;border-radius:99px">
+      <select class="select tb-select" data-change="f-label" title="Label">
         <option value="">Label</option>
         ${LABELS.map(([k]) => `<option value="${esc(k)}" ${f.label === k ? 'selected' : ''}>${esc(k)}</option>`).join('')}
       </select>
+      ${S.boardView === 'board' ? `<select class="select tb-select" data-change="group-by" title="Gruppierung">
+        ${GROUPINGS.map(([k, l]) => `<option value="${k}" ${S.groupBy === k ? 'selected' : ''}>${esc(l)}</option>`).join('')}
+      </select>` : ''}
       <div class="row" style="gap:0">
-        ${members.map((u) => `<button data-act="f-assignee" data-id="${esc(u.id)}" style="margin-left:-5px;opacity:${f.assignee && f.assignee !== u.id ? '.35' : '1'};transition:opacity .15s">${avatar(u)}</button>`).join('')}
+        ${members.map((u) => `<button class="f-av" data-act="f-assignee" data-id="${esc(u.id)}" title="${esc(u.name)}" style="opacity:${f.assignee && f.assignee !== u.id ? '.32' : '1'}">${avatar(u)}</button>`).join('')}
       </div>
-      ${active ? `<button class="btn btn-ghost btn-sm" data-act="f-reset">${I.x} Filter</button>` : ''}
+      ${active ? `<button class="btn btn-ghost btn-sm" data-act="f-reset">${I.x} Filter zurücksetzen</button>` : ''}
     </div>`;
 
-  let body = '';
+  root.innerHTML = toolbar + '<div id="board-root" class="board-root"></div>';
+
+  const si = $('#board-search');
+  if (si) {
+    si.addEventListener('input', debounce(() => {
+      S.filters.q = si.value;
+      renderBoardBody();
+      updateFilterReset();
+    }, 160));
+  }
+  renderBoardBody();
+}
+
+function updateFilterReset() {
+  const bar = $('.toolbar');
+  if (!bar) return;
+  const existing = bar.querySelector('[data-act="f-reset"]');
+  if (filtersActive() && !existing) {
+    const b = document.createElement('button');
+    b.className = 'btn btn-ghost btn-sm';
+    b.dataset.act = 'f-reset';
+    b.innerHTML = `${I.x} Filter zurücksetzen`;
+    bar.appendChild(b);
+  } else if (!filtersActive() && existing) {
+    existing.remove();
+  }
+}
+
+function renderBoardBody() {
+  const host = $('#board-root');
+  const p = projectById(S.route.id);
+  if (!host || !p) return;
+
+  const prev = host.querySelector('#board-wrap, .content');
+  const pos = prev ? { t: prev.scrollTop, l: prev.scrollLeft } : null;
   const tasks = filteredTasks(p.id);
 
   if (S.boardView === 'board') {
     const cols = projectColumns(p.id);
-    body = `<div class="board-wrap" id="board-wrap"><div class="board">
-      ${cols.map((c) => {
-        const ct = tasks.filter((t) => t.column_id === c.id).sort((a, b) => a.position - b.position);
-        const over = c.wip_limit && ct.length > c.wip_limit;
-        return `<section class="column" data-column="${esc(c.id)}">
-          <div class="column-head">
-            <h3>${esc(c.title)}<span class="n ${over ? 'over' : ''}">${ct.length}${c.wip_limit ? '/' + c.wip_limit : ''}</span></h3>
-            <div class="tools">
-              <button data-act="task-new" data-column="${esc(c.id)}" title="Aufgabe hinzufügen">${I.plus}</button>
-              <button data-act="column-edit" data-id="${esc(c.id)}" title="Spalte bearbeiten">${I.edit}</button>
+    if (!cols.length) {
+      host.innerHTML = emptyState('Dieses Projekt hat noch keine Spalten',
+        'Lege eine erste Spalte an, zum Beispiel „Zu erledigen".', 'Spalte anlegen', 'column-new');
+      const btn = host.querySelector('[data-act="column-new"]');
+      if (btn) btn.dataset.id = p.id;
+      return;
+    }
+    const lanes = buildLanes(tasks);
+    const byColumn = (list) => (c) => list.filter((t) => t.column_id === c.id).sort((a, b) => a.position - b.position);
+    const allByColumn = byColumn(tasks);
+
+    host.innerHTML = `<div class="board-wrap ${S.groupBy ? 'grouped' : ''}" id="board-wrap">
+      <div class="board-head">
+        ${cols.map((c) => columnHead(c, allByColumn(c), S.collapsed.has(c.id))).join('')}
+        <button class="col-new" data-act="column-new" data-id="${esc(p.id)}" title="Spalte hinzufügen">${I.plus}</button>
+      </div>
+      <div class="board-lanes">
+        ${lanes.length ? lanes.map((lane) => {
+          const laneCols = byColumn(lane.tasks);
+          return `<section class="lane">
+            ${S.groupBy ? `<div class="lane-head">
+              ${lane.meta ? avatar(lane.meta, 'sm') : `<span class="lane-dot"></span>`}
+              <b>${esc(lane.label)}</b><span class="lane-count">${lane.tasks.length}</span>
+            </div>` : ''}
+            <div class="lane-cols">
+              ${cols.map((c) => (S.collapsed.has(c.id)
+                ? `<button class="col-drop is-collapsed" data-act="column-collapse" data-id="${esc(c.id)}" title="${esc(c.title)} ausklappen"></button>`
+                : columnCards(c, lane.key, laneCols(c)))).join('')}
+              <div class="col-spacer"></div>
             </div>
-          </div>
-          <div class="column-body" data-column-body="${esc(c.id)}">
-            ${ct.map(taskCard).join('')}
-          </div>
-          <div class="column-foot">
-            <button class="add-card" data-act="task-new" data-column="${esc(c.id)}">${I.plus} Aufgabe</button>
-          </div>
-        </section>`;
-      }).join('')}
-      <button class="column-add" data-act="column-new" data-id="${esc(p.id)}">${I.plus} Spalte</button>
-    </div></div>`;
+          </section>`;
+        }).join('') : `<div class="lane"><div class="board-none">
+            Keine Aufgabe passt zu den Filtern.
+            <button class="link" data-act="f-reset">Filter zurücksetzen</button>
+          </div></div>`}
+      </div>
+    </div>`;
+
+    enableDrag();
+    focusComposer();
   } else if (S.boardView === 'liste') {
-    body = `<div class="content"><div class="page">${taskTable(tasks)}</div></div>`;
+    host.innerHTML = `<div class="content"><div class="page">${taskTable(tasks)}</div></div>`;
   } else if (S.boardView === 'timeline') {
-    body = `<div class="content"><div class="page">${timeline(tasks)}</div></div>`;
+    host.innerHTML = `<div class="content"><div class="page">${timeline(tasks)}</div></div>`;
   } else {
-    body = `<div class="content"><div class="page">${calendarMonth(p.id)}</div></div>`;
+    host.innerHTML = `<div class="content"><div class="page">${calendarMonth(p.id)}</div></div>`;
   }
 
-  root.innerHTML = toolbar + body;
+  const next = host.querySelector('#board-wrap, .content');
+  if (pos && next) { next.scrollTop = pos.t; next.scrollLeft = pos.l; }
+}
 
-  const si = $('#board-search');
-  if (si) {
-    si.addEventListener('input', debounce(() => { S.filters.q = si.value; renderView(true); }, 180));
+/* -------------------------------------------------------- Schnellerfassung */
+
+function focusComposer() {
+  const ta = $('#composer-input');
+  if (!ta) return;
+  ta.focus();
+  ta.setSelectionRange(ta.value.length, ta.value.length);
+  ta.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveComposer(); }
+    if (e.key === 'Escape') { e.preventDefault(); S.composer = null; renderBoardBody(); }
+  });
+  const keep = () => {
+    S.composer.text = ta.value;
+    S.composer.assignee = $('#composer-assignee').value;
+    S.composer.priority = $('#composer-prio').value;
+    S.composer.due = $('#composer-due').value;
+  };
+  ta.addEventListener('input', keep);
+  ['#composer-assignee', '#composer-prio', '#composer-due'].forEach((sel) => {
+    const el = $(sel);
+    if (el) el.addEventListener('change', keep);
+  });
+  const wrap = $('#board-wrap');
+  const drop = ta.closest('.col-drop');
+  if (wrap && drop) {
+    const r = drop.getBoundingClientRect();
+    const w = wrap.getBoundingClientRect();
+    if (r.right > w.right) wrap.scrollLeft += r.right - w.right + 16;
+    else if (r.left < w.left) wrap.scrollLeft -= w.left - r.left + 16;
   }
-  if (S.boardView === 'board') enableDrag();
+}
+
+async function saveComposer() {
+  const d = S.composer;
+  if (!d) return;
+  const title = ($('#composer-input')?.value || '').trim();
+  if (!title) { S.composer = null; renderBoardBody(); return; }
+
+  const p = projectById(S.route.id);
+  const payload = {
+    title,
+    project_id: p.id,
+    column_id: d.column,
+    assignee_id: $('#composer-assignee').value || null,
+    priority: $('#composer-prio').value || 'normal',
+    due_date: $('#composer-due').value || null,
+  };
+  if (S.groupBy && d.lane) payload[S.groupBy] = d.lane;
+
+  // Eingabefeld sofort leeren, damit man ohne Pause weitertippen kann
+  S.composer = { ...d, text: '' };
+  const ta = $('#composer-input');
+  if (ta) { ta.value = ''; ta.disabled = true; }
+
+  try {
+    await api('/tasks', 'POST', payload);
+    await refresh();
+    renderBoardBody();
+    renderSidebar();
+  } catch (e) {
+    toast(e.message, 'err');
+    if (ta) { ta.disabled = false; ta.value = title; }
+  }
 }
 
 function taskTable(tasks) {
@@ -737,7 +998,7 @@ function viewDashboard(root) {
 
   root.innerHTML = `<div class="content"><div class="page">
     <div class="page-head">
-      <h2>Moin ${esc(S.me.name.split(' ')[0])} 👋</h2>
+      <h2>Moin ${esc(S.me.name.split(' ')[0])}</h2>
       <p>${overdue.length ? `<b style="color:var(--red)">${overdue.length} überfällige Aufgabe${overdue.length === 1 ? '' : 'n'}</b> · ` : ''}${dueWeek.length} fällig in den nächsten 7 Tagen</p>
     </div>
 
@@ -936,7 +1197,7 @@ function viewMine(root) {
             <div class="tcard-meta" style="margin:0">${dueBadge(t.due_date, false)}</div>
           </div>`;
         }).join('')}
-      </div>`).join('') || emptyState('Alles erledigt 🎉', 'Dir sind aktuell keine offenen Aufgaben zugewiesen.')}
+      </div>`).join('') || emptyState('Nichts offen', 'Dir sind aktuell keine offenen Aufgaben zugewiesen.')}
 
     ${doneRecent.length ? `<div class="section-title">Zuletzt erledigt</div><div class="card">
       ${doneRecent.map((t) => `<div class="list-item" data-act="task-open" data-task="${esc(t.id)}">
@@ -962,8 +1223,7 @@ function viewProjects(root) {
         <div style="height:6px;background:linear-gradient(90deg,${esc(p.color)},${hexA(p.color, 0.4)})"></div>
         <div class="obj-body">
           <div class="row" style="margin-bottom:8px">
-            <span style="font-size:20px">${esc(p.emoji || '🏠')}</span>
-            <span class="badge">${esc(PROJECT_TYPE_NAME[p.type] || p.type)}</span>
+            <span class="badge" style="background:${hexA(p.color, 0.14)};color:${esc(p.color)}">${esc(PROJECT_TYPE_NAME[p.type] || p.type)}</span>
             ${p.status !== 'aktiv' ? `<span class="badge ${p.status === 'abgeschlossen' ? 'green' : 'amber'}">${esc(p.status)}</span>` : ''}
             <span class="push">${avatar(lead, 'sm')}</span>
           </div>
@@ -987,11 +1247,6 @@ function viewProjects(root) {
 /* ====================================================== Ansicht: Objekte */
 
 function viewProperties(root) {
-  const q = (S.filters.q || '').toLowerCase();
-  const list = S.properties.filter((p) =>
-    (!q || `${p.title} ${p.street || ''} ${p.city || ''} ${p.code}`.toLowerCase().includes(q))
-    && (!S.filters.deal || p.deal === S.filters.deal));
-
   root.innerHTML = `<div class="content"><div class="page">
     <div class="page-head"><h2>Objekte</h2><p>${S.properties.length} Objekte im Portfolio${S.filters.deal ? ` · Filter: ${esc((DEAL_MAP[S.filters.deal] || [])[1] || '')}` : ''}</p></div>
     <div class="row wrap" style="margin-bottom:18px;gap:8px">
@@ -1001,12 +1256,28 @@ function viewProperties(root) {
       </div>
       ${DEALS.map(([k, l]) => `<button class="chip ${S.filters.deal === k ? 'on' : ''}" data-act="prop-filter" data-deal="${k}">${esc(l)} <b>${S.properties.filter((p) => p.deal === k).length}</b></button>`).join('')}
     </div>
-    ${list.length ? `<div class="obj-grid">${list.map(propertyCard).join('')}</div>`
-      : emptyState('Keine Objekte gefunden', 'Lege ein Objekt an oder ändere die Suche.', 'Objekt anlegen', 'property-new')}
+    <div id="prop-list"></div>
   </div></div>`;
+  renderPropertyGrid();
 
   const s = $('#prop-search');
-  if (s) s.addEventListener('input', debounce(() => { S.filters.q = s.value; renderView(true); }, 180));
+  if (s) s.addEventListener('input', debounce(() => { S.filters.q = s.value; renderPropertyGrid(); }, 160));
+}
+
+function filteredProperties() {
+  const q = (S.filters.q || '').toLowerCase();
+  return S.properties.filter((p) =>
+    (!q || `${p.title} ${p.street || ''} ${p.city || ''} ${p.code}`.toLowerCase().includes(q))
+    && (!S.filters.deal || p.deal === S.filters.deal));
+}
+
+function renderPropertyGrid() {
+  const host = $('#prop-list');
+  if (!host) return;
+  const list = filteredProperties();
+  host.innerHTML = list.length
+    ? `<div class="obj-grid">${list.map(propertyCard).join('')}</div>`
+    : emptyState('Keine Objekte gefunden', 'Lege ein Objekt an oder ändere die Suche.', 'Objekt anlegen', 'property-new');
 }
 
 function propertyCard(p) {
@@ -1214,33 +1485,40 @@ function photoLightbox(id) {
 /* ===================================================== Ansicht: Kontakte */
 
 function viewContacts(root) {
-  const q = (S.filters.q || '').toLowerCase();
-  const list = S.contacts.filter((c) => !q || `${c.name} ${c.company || ''} ${c.email || ''} ${c.phone || ''}`.toLowerCase().includes(q));
-  const groups = CONTACT_ROLES.map(([k, l]) => [l, list.filter((c) => c.role === k)]).filter((g) => g[1].length);
-
   root.innerHTML = `<div class="content"><div class="page">
     <div class="page-head"><h2>Kontakte</h2><p>${S.contacts.length} Kontakte</p></div>
     <div style="position:relative;max-width:300px;margin-bottom:18px">
       <span style="position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--faint)">${I.search}</span>
       <input class="input" id="con-search" placeholder="Name, Firma, E-Mail …" value="${esc(S.filters.q)}" style="padding-left:33px">
     </div>
-    ${groups.length ? groups.map(([label, items]) => `
-      <div class="section-title">${esc(label)} <span class="badge" style="margin-left:6px">${items.length}</span></div>
-      <div class="card">${items.map((c) => `
-        <div class="list-item" data-act="contact-edit" data-id="${esc(c.id)}">
-          <div class="avatar" style="background:#8a8f98">${esc(c.name.split(' ').map((x) => x[0]).slice(0, 2).join('').toUpperCase())}</div>
-          <div style="flex:1;min-width:0">
-            <div class="trunc bold small">${esc(c.name)}</div>
-            <div class="trunc tiny faint">${esc([c.company, c.property_id ? propertyById(c.property_id)?.title : ''].filter(Boolean).join(' · ') || '—')}</div>
-          </div>
-          <div class="small muted trunc" style="width:180px">${c.email ? `<a class="link" href="mailto:${esc(c.email)}" onclick="event.stopPropagation()">${esc(c.email)}</a>` : ''}</div>
-          <div class="small muted" style="width:140px">${c.phone ? `<a class="link" href="tel:${esc(c.phone.replace(/\s/g, ''))}" onclick="event.stopPropagation()">${esc(c.phone)}</a>` : ''}</div>
-        </div>`).join('')}</div>`).join('')
-      : emptyState('Keine Kontakte', 'Lege Eigentümer, Käufer, Handwerker und Notare an.', 'Kontakt anlegen', 'contact-new')}
+    <div id="contact-list"></div>
   </div></div>`;
+  renderContactList();
 
   const s = $('#con-search');
-  if (s) s.addEventListener('input', debounce(() => { S.filters.q = s.value; renderView(true); }, 180));
+  if (s) s.addEventListener('input', debounce(() => { S.filters.q = s.value; renderContactList(); }, 160));
+}
+
+function renderContactList() {
+  const host = $('#contact-list');
+  if (!host) return;
+  const q = (S.filters.q || '').toLowerCase();
+  const list = S.contacts.filter((c) => !q || `${c.name} ${c.company || ''} ${c.email || ''} ${c.phone || ''}`.toLowerCase().includes(q));
+  const groups = CONTACT_ROLES.map(([k, l]) => [l, list.filter((c) => c.role === k)]).filter((g) => g[1].length);
+
+  host.innerHTML = groups.length ? groups.map(([label, items]) => `
+    <div class="section-title">${esc(label)} <span class="badge" style="margin-left:6px">${items.length}</span></div>
+    <div class="card">${items.map((c) => `
+      <div class="list-item" data-act="contact-edit" data-id="${esc(c.id)}">
+        <div class="avatar" style="background:#8a8f98">${esc(c.name.split(' ').map((x) => x[0]).slice(0, 2).join('').toUpperCase())}</div>
+        <div style="flex:1;min-width:0">
+          <div class="trunc bold small">${esc(c.name)}</div>
+          <div class="trunc tiny faint">${esc([c.company, c.property_id ? propertyById(c.property_id)?.title : ''].filter(Boolean).join(' · ') || '—')}</div>
+        </div>
+        <div class="small muted trunc" style="width:180px">${c.email ? `<a class="link" href="mailto:${esc(c.email)}" onclick="event.stopPropagation()">${esc(c.email)}</a>` : ''}</div>
+        <div class="small muted" style="width:140px">${c.phone ? `<a class="link" href="tel:${esc(c.phone.replace(/\s/g, ''))}" onclick="event.stopPropagation()">${esc(c.phone)}</a>` : ''}</div>
+      </div>`).join('')}</div>`).join('')
+    : emptyState('Keine Kontakte', 'Lege Eigentümer, Käufer, Handwerker und Notare an.', 'Kontakt anlegen', 'contact-new');
 }
 
 /* ===================================================== Ansicht: Kalender */
@@ -1481,7 +1759,7 @@ function taskDrawer(t) {
       <div class="section-title">Kommentare (${comments.length})</div>
       <form id="comment-form" class="row" style="gap:8px;align-items:flex-start">
         ${avatar(S.me, 'sm')}
-        <textarea class="textarea" name="body" rows="2" placeholder="Kommentar schreiben … (⌘↵ zum Senden)" style="min-height:60px"></textarea>
+        <textarea class="textarea" name="body" rows="2" placeholder="Kommentar schreiben … (Strg + Eingabe zum Senden)" style="min-height:60px"></textarea>
       </form>
       <div class="row" style="justify-content:flex-end;margin-top:6px">
         <button class="btn btn-primary btn-sm" data-act="comment-submit">Kommentieren</button>
@@ -1501,10 +1779,9 @@ function taskDrawer(t) {
     </div>
 
     <div class="drawer-foot">
-      <button class="btn btn-primary" data-act="task-save" data-task="${esc(t.id)}">Speichern</button>
+      ${isDoneTask(t) ? '<span class="badge green dot">Erledigt</span>' : `<button class="btn btn-primary" data-act="task-complete" data-task="${esc(t.id)}">${I.check} Als erledigt markieren</button>`}
       <button class="btn btn-ghost" data-act="close-layer">Schließen</button>
-      <div class="push"></div>
-      ${isDoneTask(t) ? '<span class="badge green dot">Erledigt</span>' : `<button class="btn btn-soft" data-act="task-complete" data-task="${esc(t.id)}">${I.check} Erledigt</button>`}
+      <span class="push save-state" id="save-state">Änderungen werden automatisch gespeichert</span>
     </div>
   </aside>`;
 }
@@ -1529,9 +1806,6 @@ function modalHtml(cfg) {
     } else if (fld.type === 'color') {
       input = `<div class="swatches">${COLORS.map((c) => `<button type="button" class="swatch ${String(v).toLowerCase() === c.toLowerCase() ? 'on' : ''}" style="background:${c}" data-act="modal-color" data-color="${c}"></button>`).join('')}</div>
         <input type="hidden" name="${esc(fld.name)}" value="${esc(v)}" id="modal-color">`;
-    } else if (fld.type === 'emoji') {
-      input = `<div class="row wrap" style="gap:5px">${EMOJIS.map((e) => `<button type="button" class="chip ${v === e ? 'on' : ''}" data-act="modal-emoji" data-emoji="${e}" style="width:36px;justify-content:center">${e}</button>`).join('')}</div>
-        <input type="hidden" name="${esc(fld.name)}" value="${esc(v)}" id="modal-emoji">`;
     } else if (fld.type === 'members') {
       input = `<div class="row wrap" style="gap:6px">${S.users.map((u) => {
         const on = (fld.value || []).includes(u.id);
@@ -1667,6 +1941,63 @@ function renderLayer() {
 
   const ta = $('#t-title');
   if (ta) autoGrow(ta);
+  wireTaskAutosave();
+}
+
+/* Jede Änderung im Aufgaben-Detail geht sofort raus — kein Speichern-Knopf,
+   also auch kein stiller Datenverlust beim Schließen. */
+function wireTaskAutosave() {
+  const drawer = $('.drawer');
+  if (!drawer || !S.drawerTask) return;
+  const id = S.drawerTask;
+
+  $$('[data-task-field]', drawer).forEach((el) => {
+    el.addEventListener('change', () => saveTaskField(id, el.dataset.taskField, el));
+  });
+
+  const title = $('#t-title');
+  const desc = $('#t-desc');
+  const commit = (el, field) => {
+    let last = el.value;
+    el.addEventListener('blur', () => {
+      const v = field === 'title' ? el.value.trim() : el.value;
+      if (v === last) return;
+      last = v;
+      saveTaskField(id, field, { value: v || (field === 'title' ? 'Ohne Titel' : '') });
+    });
+    el.addEventListener('keydown', (e) => {
+      if (field === 'title' && e.key === 'Enter') { e.preventDefault(); el.blur(); }
+    });
+  };
+  if (title) commit(title, 'title');
+  if (desc) commit(desc, 'description');
+}
+
+function setSaveState(text, kind) {
+  const el = $('#save-state');
+  if (!el) return;
+  el.textContent = text;
+  el.className = 'push save-state' + (kind ? ' ' + kind : '');
+}
+
+async function saveTaskField(id, field, el) {
+  let value = el.value;
+  if (value === '') value = null;
+  if (value !== null && ['estimate', 'amount'].includes(field)) value = Number(value);
+
+  setSaveState('Speichert …');
+  try {
+    if (field === 'column_id') await api('/tasks/move', 'POST', { id, column_id: value });
+    else await api('/tasks/' + id, 'PATCH', { [field]: value });
+    await refresh();
+    setSaveState('Gespeichert', 'ok');
+    renderSidebar();
+    if (S.route.name === 'board' && $('#board-root')) renderBoardBody();
+    else renderView(true);
+    if (field === 'column_id') renderLayer();
+  } catch (e) {
+    setSaveState('Nicht gespeichert: ' + e.message, 'err');
+  }
 }
 
 function autoGrow(el) {
@@ -1749,7 +2080,7 @@ function onPointerDown(e) {
     ev.preventDefault();
     moveDrag(ev);
   };
-  const up = (ev) => {
+  const up = () => {
     window.removeEventListener('pointermove', move);
     window.removeEventListener('pointerup', up);
     window.removeEventListener('pointercancel', cancel);
@@ -1786,10 +2117,12 @@ function beginDrag(card, rect, x, y) {
   card.classList.add('dragging');
   card.style.display = 'none';
 
+  const body = card.closest('.col-cards');
   dragState = {
     card, ghost, ph,
     dx: x - rect.left, dy: y - rect.top,
-    fromColumn: card.closest('.column-body').dataset.columnBody,
+    fromColumn: body ? body.dataset.columnBody : null,
+    fromLane: body ? (body.dataset.lane || '') : '',
     taskId: card.dataset.task,
   };
   document.body.style.userSelect = 'none';
@@ -1802,12 +2135,15 @@ function moveDrag(e) {
   d.ghost.style.left = (e.clientX - d.dx) + 'px';
   d.ghost.style.top = (e.clientY - d.dy) + 'px';
 
-  // horizontales Auto-Scrolling am Rand
   const wrap = $('#board-wrap');
   if (wrap) {
     const r = wrap.getBoundingClientRect();
-    if (e.clientX > r.right - 70) wrap.scrollLeft += 14;
-    else if (e.clientX < r.left + 70) wrap.scrollLeft -= 14;
+    if (e.clientX > r.right - 80) wrap.scrollLeft += 16;
+    else if (e.clientX < r.left + 80) wrap.scrollLeft -= 16;
+    if (wrap.classList.contains('grouped')) {
+      if (e.clientY > r.bottom - 70) wrap.scrollTop += 14;
+      else if (e.clientY < r.top + 70) wrap.scrollTop -= 14;
+    }
   }
 
   d.ghost.style.visibility = 'hidden';
@@ -1815,20 +2151,39 @@ function moveDrag(e) {
   d.ghost.style.visibility = '';
   if (!under) return;
 
-  const column = under.closest('.column');
-  $$('.column').forEach((c) => c.classList.toggle('drop-active', c === column));
-  if (!column) return;
-  const body = column.querySelector('.column-body');
+  const drop = under.closest('.col-drop');
+  $$('.col-drop').forEach((c) => c.classList.toggle('drop-active', c === drop));
+  if (!drop) return;
+  const body = drop.querySelector('.col-cards');
   if (!body) return;
 
+  // Innerhalb der Spalte die Einfügestelle anhand der Kartenmitten bestimmen
   const cards = Array.from(body.querySelectorAll('.tcard:not(.dragging)'));
   let target = null;
   for (const c of cards) {
     const r = c.getBoundingClientRect();
     if (e.clientY < r.top + r.height / 2) { target = c; break; }
   }
+  const more = body.querySelector('.col-more');
   if (target) body.insertBefore(d.ph, target);
+  else if (more) body.insertBefore(d.ph, more);
   else body.appendChild(d.ph);
+
+  const hint = body.querySelector('.col-empty');
+  if (hint) hint.remove();
+}
+
+/* Position zwischen zwei Nachbarn — bewusst kein Neuschreiben der ganzen
+   Spalte, sonst würde ein aktiver Filter die verborgenen Karten umsortieren. */
+function neighbourPosition(prevId, nextId) {
+  const prev = prevId ? byId(S.tasks, prevId) : null;
+  const next = nextId ? byId(S.tasks, nextId) : null;
+  if (!prev && !next) return { position: 1024 };
+  if (!prev) return { position: next.position - 1024 };
+  if (!next) return { position: prev.position + 1024 };
+  const gap = next.position - prev.position;
+  if (gap < 1) return { renumber: true };
+  return { position: prev.position + gap / 2 };
 }
 
 async function endDrag(cancelled) {
@@ -1837,33 +2192,62 @@ async function endDrag(cancelled) {
   dragState = null;
   document.body.style.userSelect = '';
   document.body.style.cursor = '';
-  $$('.column').forEach((c) => c.classList.remove('drop-active'));
+  $$('.col-drop').forEach((c) => c.classList.remove('drop-active'));
   d.ghost.remove();
 
   const body = d.ph.parentNode;
+  const toColumn = body.dataset.columnBody;
+  const toLane = body.dataset.lane || '';
+
+  const siblingId = (dir) => {
+    let el = dir < 0 ? d.ph.previousElementSibling : d.ph.nextElementSibling;
+    while (el && (!el.classList.contains('tcard') || el.classList.contains('dragging'))) {
+      el = dir < 0 ? el.previousElementSibling : el.nextElementSibling;
+    }
+    return el ? el.dataset.task : null;
+  };
+  const prevId = siblingId(-1);
+  const nextId = siblingId(1);
+
   body.insertBefore(d.card, d.ph);
   d.ph.remove();
   d.card.style.display = '';
   d.card.classList.remove('dragging');
-
-  const toColumn = body.dataset.columnBody;
-  const order = Array.from(body.querySelectorAll('.tcard')).map((c) => c.dataset.task);
   if (cancelled) return;
 
-  // Lokal sofort anwenden, damit die Oberfläche nicht springt
   const task = byId(S.tasks, d.taskId);
-  if (task) {
-    task.column_id = toColumn;
-    const col = byId(S.columns, toColumn);
-    task.done_at = col && col.is_done ? (task.done_at || new Date().toISOString()) : null;
-    order.forEach((id, i) => { const t = byId(S.tasks, id); if (t) t.position = (i + 1) * 1024; });
+  if (!task) return;
+  const laneChanged = !!S.groupBy && toLane !== String(task[S.groupBy] || '');
+  if (toColumn === d.fromColumn && prevId === null && nextId === null && !laneChanged) return;
+
+  const spot = neighbourPosition(prevId, nextId);
+  const payload = { id: d.taskId, column_id: toColumn };
+  if (spot.renumber) {
+    const inColumn = S.tasks
+      .filter((t) => t.column_id === toColumn && t.id !== d.taskId)
+      .sort((a, b) => a.position - b.position)
+      .map((t) => t.id);
+    const at = prevId ? inColumn.indexOf(prevId) + 1 : 0;
+    inColumn.splice(at, 0, d.taskId);
+    payload.order = inColumn;
+  } else {
+    payload.position = spot.position;
   }
+
+  // Lokal sofort anwenden, damit nichts springt
+  task.column_id = toColumn;
+  if (payload.position !== undefined) task.position = payload.position;
+  const col = byId(S.columns, toColumn);
+  task.done_at = col && col.is_done ? (task.done_at || new Date().toISOString()) : null;
+  if (laneChanged) task[S.groupBy] = toLane || null;
   renderSidebar();
 
   try {
-    await api('/tasks/move', 'POST', { id: d.taskId, column_id: toColumn, order });
+    await api('/tasks/move', 'POST', payload);
+    if (laneChanged) await api('/tasks/' + d.taskId, 'PATCH', { [S.groupBy]: toLane || null });
     await refresh();
     renderSidebar();
+    if (laneChanged) renderBoardBody();
   } catch (e) {
     toast(e.message, 'err');
     await refresh();
@@ -1920,7 +2304,6 @@ function actProjectModal(id) {
       { name: 'due_date', label: 'Zieltermin', type: 'date', value: p?.due_date },
       { name: 'volume', label: 'Volumen (€)', type: 'number', step: '1000', value: p?.volume },
       { name: 'budget', label: 'Budget (€)', type: 'number', step: '1000', value: p?.budget },
-      { name: 'emoji', label: 'Symbol', type: 'emoji', value: p?.emoji || '🏠' },
       { name: 'color', label: 'Farbe', type: 'color', value: p?.color || COLORS[0] },
       { name: 'member_ids', label: 'Team', type: 'members', span: true, value: p ? projectMembers(p.id).map((u) => u.id) : [S.me.id] },
     ],
@@ -2093,29 +2476,6 @@ async function submitComment() {
   });
 }
 
-async function saveTaskDrawer(id) {
-  const drawer = $('.drawer');
-  if (!drawer) return;
-  const payload = {};
-  $$('[data-task-field]', drawer).forEach((el) => {
-    let v = el.value;
-    if (el.type === 'number') v = v === '' ? null : Number(v);
-    payload[el.dataset.taskField] = v === '' ? null : v;
-  });
-  payload.title = $('#t-title').value.trim() || 'Ohne Titel';
-  payload.description = $('#t-desc').value;
-
-  await guard(async () => {
-    const before = byId(S.tasks, id);
-    await api('/tasks/' + id, 'PATCH', payload);
-    if (before && payload.column_id && payload.column_id !== before.column_id) {
-      await api('/tasks/move', 'POST', { id, column_id: payload.column_id, order: [] });
-    }
-    await refresh();
-    render();
-  }, 'Aufgabe gespeichert.');
-}
-
 /* --------------------------------------------------- Ereignisverarbeitung */
 
 const ACTIONS = {
@@ -2134,10 +2494,48 @@ const ACTIONS = {
   },
   'close-layer': () => { modalConfig = null; S.drawerTask = null; S.menuOpen = null; S.lightbox = null; renderLayer(); },
 
-  'board-view': (el) => { S.boardView = el.dataset.view; renderView(); },
+  'board-view': (el) => { S.boardView = el.dataset.view; S.composer = null; renderView(); },
+
+  'composer-open': (el) => {
+    S.composer = { column: el.dataset.column, lane: el.dataset.lane || '', text: '', priority: 'normal', assignee: S.me.id, due: '' };
+    S.menuOpen = null;
+    renderBoardBody();
+  },
+  'composer-close': () => { S.composer = null; renderBoardBody(); },
+  'composer-save': () => saveComposer(),
+  'show-all-done': (el) => { S.showAllDone.add(el.dataset.id); renderBoardBody(); },
+  'column-collapse': (el) => {
+    const id = el.dataset.id;
+    if (S.collapsed.has(id)) S.collapsed.delete(id); else S.collapsed.add(id);
+    saveCollapsed(S.route.id);
+    S.menuOpen = null;
+    renderBoardBody();
+  },
+  'column-move': async (el) => {
+    const cols = projectColumns(S.route.id).map((c) => c.id);
+    const i = cols.indexOf(el.dataset.id);
+    const j = i + Number(el.dataset.dir);
+    S.menuOpen = null;
+    if (j < 0 || j >= cols.length) { renderBoardBody(); return; }
+    cols.splice(j, 0, cols.splice(i, 1)[0]);
+    cols.forEach((id, pos) => { const c = byId(S.columns, id); if (c) c.position = pos; });
+    renderBoardBody();
+    await guard(async () => { await api('/columns/reorder', 'POST', { order: cols }); await refresh(); });
+  },
+  'column-delete': async (el) => {
+    const c = byId(S.columns, el.dataset.id);
+    if (!c) return;
+    const n = S.tasks.filter((t) => t.column_id === c.id).length;
+    if (n) return toast(`„${c.title}" enthält noch ${n} Aufgabe(n).`, 'err');
+    if (!confirm(`Spalte „${c.title}" löschen?`)) return;
+    S.menuOpen = null;
+    await guard(async () => { await api('/columns/' + c.id, 'DELETE'); await refresh(); render(); }, 'Spalte gelöscht.');
+  },
+
   'f-mine': () => { S.filters.mine = !S.filters.mine; renderView(true); },
   'f-overdue': () => { S.filters.overdue = !S.filters.overdue; renderView(true); },
   'f-assignee': (el) => { S.filters.assignee = S.filters.assignee === el.dataset.id ? null : el.dataset.id; renderView(true); },
+  'group-by': () => {},
   'f-reset': () => { S.filters = { q: '', assignee: null, priority: null, label: null, mine: false, overdue: false, deal: null }; renderView(); },
   'filter-overdue': () => {
     S.filters.overdue = true;
@@ -2148,10 +2546,10 @@ const ACTIONS = {
     S.filters.deal = S.filters.deal === el.dataset.deal ? null : el.dataset.deal;
     renderView(true);
   },
+  'noop': () => {},
 
   'task-open': (el) => openTask(el.dataset.task),
   'task-new': (el) => actNewTask(el.dataset.column),
-  'task-save': (el) => saveTaskDrawer(el.dataset.task),
   'task-delete': async (el) => {
     if (!confirm('Aufgabe wirklich löschen?')) return;
     await guard(async () => {
@@ -2178,7 +2576,7 @@ const ACTIONS = {
     await guard(async () => {
       await api('/tasks/move', 'POST', { id: t.id, column_id: done.id, order: [] });
       await refresh(); render();
-    }, 'Erledigt ✓');
+    }, 'Als erledigt markiert.');
   },
   'task-label': async (el) => {
     const t = byId(S.tasks, el.dataset.task);
@@ -2282,11 +2680,6 @@ const ACTIONS = {
     $$('.swatch', el.parentNode).forEach((s) => s.classList.remove('on'));
     el.classList.add('on');
   },
-  'modal-emoji': (el) => {
-    $('#modal-emoji').value = el.dataset.emoji;
-    $$('.chip', el.parentNode).forEach((s) => s.classList.remove('on'));
-    el.classList.add('on');
-  },
   'modal-member': (el) => {
     const input = $('#modal-members');
     const set = new Set(input.value.split(',').filter(Boolean));
@@ -2330,6 +2723,7 @@ document.addEventListener('change', (ev) => {
   const c = el.dataset.change;
   if (c === 'f-prio') { S.filters.priority = el.value || null; renderView(true); }
   if (c === 'f-label') { S.filters.label = el.value || null; renderView(true); }
+  if (c === 'group-by') { S.groupBy = el.value; S.composer = null; renderBoardBody(); }
 });
 
 document.addEventListener('keydown', (ev) => {
@@ -2364,12 +2758,19 @@ document.addEventListener('keydown', (ev) => {
     return;
   }
   if (ev.key === 'Escape') {
+    // Erst den Fokus abgeben, damit Titel und Beschreibung noch gespeichert werden
+    const active = document.activeElement;
+    if (active && active.closest('.drawer') && /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName)) {
+      active.blur();
+      ev.preventDefault();
+      return;
+    }
     if (modalConfig || S.drawerTask || S.menuOpen || S.lightbox) { modalConfig = null; S.drawerTask = null; S.menuOpen = null; S.lightbox = null; renderLayer(); render(); }
     return;
   }
   const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(ev.target.tagName);
   if (typing) {
-    if (ev.key === 'Enter' && (ev.metaKey || ev.ctrlKey) && S.drawerTask) saveTaskDrawer(S.drawerTask);
+    if (ev.key === 'Enter' && (ev.metaKey || ev.ctrlKey) && S.drawerTask) ev.target.blur();
     return;
   }
   if (ev.key === 'n') { ev.preventDefault(); actNewTask(); }

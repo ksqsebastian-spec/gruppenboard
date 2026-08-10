@@ -219,7 +219,7 @@ const DEFAULT_COLUMNS = [
 ];
 
 const PROJECT_FIELDS = [
-  'name', 'description', 'type', 'status', 'color', 'emoji', 'property_id',
+  'name', 'description', 'type', 'status', 'color', 'property_id',
   'lead_id', 'budget', 'volume', 'start_date', 'due_date', 'position', 'archived',
 ];
 const TASK_FIELDS = [
@@ -444,22 +444,30 @@ async function handleApi(request, env, url) {
   }
 
   if (path === '/tasks/move' && method === 'POST') {
-    const { id, column_id, order } = body;
+    const { id, column_id, order, position } = body;
     if (!id || !column_id) return fail(400, 'Ungültiger Zug.');
     const col = await db.prepare('SELECT is_done, project_id, title FROM columns WHERE id = ?').bind(column_id).first();
     if (!col) return fail(404, 'Spalte nicht gefunden.');
-    const task = await db.prepare('SELECT title, done_at, project_id FROM tasks WHERE id = ?').bind(id).first();
+    const task = await db.prepare('SELECT title, done_at, project_id, column_id FROM tasks WHERE id = ?').bind(id).first();
     if (!task) return fail(404, 'Aufgabe nicht gefunden.');
 
     const done_at = col.is_done ? (task.done_at || nowIso()) : null;
-    await db.prepare('UPDATE tasks SET column_id = ?, project_id = ?, done_at = ?, updated_at = ? WHERE id = ?')
-      .bind(column_id, col.project_id, done_at, nowIso(), id).run();
+    if (typeof position === 'number' && Number.isFinite(position)) {
+      await db.prepare('UPDATE tasks SET column_id = ?, project_id = ?, done_at = ?, position = ?, updated_at = ? WHERE id = ?')
+        .bind(column_id, col.project_id, done_at, position, nowIso(), id).run();
+    } else {
+      await db.prepare('UPDATE tasks SET column_id = ?, project_id = ?, done_at = ?, updated_at = ? WHERE id = ?')
+        .bind(column_id, col.project_id, done_at, nowIso(), id).run();
+    }
 
+    // Nur wenn ausdrücklich eine Reihenfolge mitkommt, wird die Spalte neu nummeriert
     const ids = Array.isArray(order) ? order : [];
     for (let i = 0; i < ids.length; i++) {
       await db.prepare('UPDATE tasks SET position = ? WHERE id = ?').bind((i + 1) * 1024, ids[i]).run();
     }
-    await logActivity(db, me, 'move', 'task', id, `„${task.title}" → ${col.title}`, col.project_id);
+    if (task.column_id !== column_id) {
+      await logActivity(db, me, 'move', 'task', id, `„${task.title}" → ${col.title}`, col.project_id);
+    }
     return json({ ok: true });
   }
 

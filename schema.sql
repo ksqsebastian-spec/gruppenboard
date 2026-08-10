@@ -89,7 +89,6 @@ CREATE TABLE projects (
   type         TEXT NOT NULL DEFAULT 'verwaltung',
   status       TEXT NOT NULL DEFAULT 'aktiv',
   color        TEXT NOT NULL DEFAULT '#FF4E5B',
-  emoji        TEXT DEFAULT '🏠',
   property_id  TEXT REFERENCES properties(id) ON DELETE SET NULL,
   lead_id      TEXT REFERENCES users(id) ON DELETE SET NULL,
   budget       REAL,

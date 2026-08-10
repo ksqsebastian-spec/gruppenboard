@@ -15,18 +15,33 @@ ausgeliefert.
 
 ## Funktionsumfang
 
-**Kanban-Board**
-- Spalten pro Projekt frei konfigurierbar, inkl. WIP-Limit und „gilt als erledigt"
-- Drag & Drop mit Pointer-Events (Maus, Trackpad, Touch über den Ziehgriff)
-- Karten mit Priorität, Fälligkeit, Labels, Objektbezug, Betrag, Checklisten-
-  und Kommentarzähler
-- Filter: Volltext, Zuständigkeit, Priorität, Label, „nur meine", „überfällig"
+**Kanban-Board** — das Herzstück
+- Spalten in voller Höhe mit eigenem Scrollbereich; Kopfzeile bleibt beim
+  Scrollen stehen
+- Schnellerfassung direkt in der Spalte: Titel tippen, Eingabetaste, nächste
+  Karte — ohne Dialog. Zuständigkeit, Priorität und Fälligkeit gleich mit
+- Drag & Drop mit Pointer-Events (Maus, Trackpad, Touch über den Ziehgriff).
+  Verschieben setzt nur die Position der gezogenen Karte, nie die der anderen —
+  dadurch bleibt die Sortierung auch bei aktivem Filter korrekt
+- Spalten umsortieren, einklappen (bleibt pro Projekt gespeichert), umbenennen,
+  WIP-Limit setzen, als „Erledigt"-Spalte markieren, löschen
+- Swimlanes: Gruppierung nach Zuständigkeit, Priorität oder Objekt. Eine Karte
+  in eine andere Bahn zu ziehen ändert die Zuordnung mit
+- Spaltenkopf zeigt Anzahl, WIP-Auslastung (rot bei Überschreitung) und die
+  Summe der hinterlegten Beträge
+- Die „Erledigt"-Spalte zeigt die letzten 15 Karten, ältere auf Klick
+- Karten mit Labels als Text, Priorität, Fälligkeit (mit Überfälligkeitszähler),
+  Objektbezug, Betrag, Checklisten-, Kommentar- und Dokumentzähler
+- Filter: Volltext (Titel, Beschreibung, Labels, Objekt), Zuständigkeit,
+  Priorität, Label, „nur meine", „überfällig"
 
 **Vier Ansichten je Projekt** — Board, Liste, Timeline (Gantt-artig), Kalender
 
 **Aufgaben-Detail** — Beschreibung, Checkliste mit Fortschritt, Kommentare,
 Zuständigkeit, Start- und Fälligkeitsdatum, Aufwand, Betrag, Objekt- und
-Kontaktbezug, Dokumentlinks
+Kontaktbezug, Dokumentlinks. Jede Änderung wird sofort gespeichert; es gibt
+keinen Speichern-Knopf und damit auch keinen stillen Datenverlust beim
+Schließen
 
 **Objekte** — Stammdaten (Fläche, Zimmer, Einheiten, Grundstück, Baujahr,
 Energieklasse), Preise, Kaltmiete, automatisch berechnete Bruttorendite,
@@ -53,6 +68,8 @@ Teamauslastung, 14-Tage-Verlauf, nächste Termine, Aktivitätsprotokoll
 **Weiteres** — Team-Übersicht mit Auslastung, Aktivitätsverlauf, Befehlspalette
 (⌘K / Strg+K), helles und dunkles Design, Tastaturkürzel (`n` neue Aufgabe,
 `g`+`d`/`m`/`o`/`k` zum Springen), vollständig responsiv bis 390 px.
+Die Oberfläche kommt ohne Emojis aus — Zustände werden über Farbe, Form und
+Text ausgedrückt.
 
 ## Datenbestand
 
@@ -102,14 +119,14 @@ schema.sql           Datenbankschema
 seed.sql             Erzeugt aus scripts/gen-seed.mjs (Konten + Beispieldaten)
 scripts/build.mjs    Bettet HTML/CSS/JS in dist/worker.js ein
 scripts/gen-seed.mjs Erzeugt seed.sql inkl. Passwort-Hashes
-scripts/local-test.mjs   77 Integrationstests gegen node:sqlite und R2-Attrappe
+scripts/local-test.mjs   86 Integrationstests gegen node:sqlite und R2-Attrappe
 scripts/local-server.mjs Lokaler Server auf Port 8788
 ```
 
 ## Entwicklung
 
 ```bash
-npm run test    # Build + 77 Integrationstests (node:sqlite als D1-Ersatz)
+npm run test    # Build + 86 Integrationstests (node:sqlite als D1-Ersatz)
 npm run dev     # http://127.0.0.1:8788, Daten im Arbeitsspeicher
 npm run build   # dist/worker.js erzeugen
 ```
@@ -149,7 +166,7 @@ Schreibende Anfragen brauchen `X-Mikdaten: 1`.
 | PATCH | `/account` · POST `/account/password` | Profil, Passwort |
 | POST/PATCH/DELETE | `/projects[/:id]` | Projekte (Anlegen erzeugt Standardspalten) |
 | POST/PATCH/DELETE | `/columns[/:id]`, POST `/columns/reorder` | Spalten |
-| POST/PATCH/DELETE | `/tasks[/:id]`, POST `/tasks/move` | Aufgaben, Verschieben inkl. Reihenfolge |
+| POST/PATCH/DELETE | `/tasks[/:id]`, POST `/tasks/move` | Aufgaben; `move` nimmt `position` (einzelne Karte) oder `order` (Spalte neu nummerieren) |
 | POST/DELETE | `/comments[/:id]` | Kommentare |
 | POST/PATCH/DELETE | `/checklist[/:id]` | Checklistenpunkte |
 | POST/PATCH/DELETE | `/properties[/:id]` | Objekte |

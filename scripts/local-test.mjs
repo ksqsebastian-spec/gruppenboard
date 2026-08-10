@@ -332,6 +332,59 @@ cookie = '';
 r = await call('/api/state');
 check('Nach Abmeldung gesperrt', r.status === 401);
 
+/* --- Verschieben per Position (statt Neunummerierung der ganzen Spalte) --- */
+cookie = '';
+await call('/api/auth/login', 'POST', { login: 'christian.jonas', password: 'Mikdaten#Immo2026' });
+r = await call('/api/state');
+const hegeCols = r.json.columns.filter((c) => c.project_id === 'prj_hege').sort((a, b) => a.position - b.position);
+const src = hegeCols[1], dst = hegeCols[2];
+const before = r.json.tasks.filter((t) => t.column_id === dst.id).sort((a, b) => a.position - b.position);
+const mover = r.json.tasks.find((t) => t.column_id === src.id);
+const otherPositions = r.json.tasks
+  .filter((t) => t.column_id === dst.id)
+  .map((t) => [t.id, t.position]);
+
+const between = before.length >= 2 ? (before[0].position + before[1].position) / 2 : 512;
+r = await call('/api/tasks/move', 'POST', { id: mover.id, column_id: dst.id, position: between });
+check('Zug mit Position akzeptiert', r.status === 200, r.json);
+r = await call('/api/state');
+const movedTask = r.json.tasks.find((t) => t.id === mover.id);
+check('Position exakt übernommen', movedTask.position === between, movedTask.position);
+check('Spalte gewechselt', movedTask.column_id === dst.id);
+const unchanged = otherPositions.every(([id, pos]) => {
+  const t = r.json.tasks.find((x) => x.id === id);
+  return t && t.position === pos;
+});
+check('Übrige Karten behalten ihre Position', unchanged);
+
+// Reihenfolge-Variante nummeriert weiterhin neu
+const order = r.json.tasks.filter((t) => t.column_id === dst.id).sort((a, b) => a.position - b.position).map((t) => t.id);
+r = await call('/api/tasks/move', 'POST', { id: order[0], column_id: dst.id, order });
+r = await call('/api/state');
+const renumbered = r.json.tasks.filter((t) => t.column_id === dst.id).sort((a, b) => a.position - b.position);
+check('Neunummerierung auf Vielfache von 1024', renumbered.every((t, i) => t.position === (i + 1) * 1024),
+  renumbered.map((t) => t.position));
+
+// Spaltenreihenfolge
+const newOrder = [hegeCols[1].id, hegeCols[0].id, ...hegeCols.slice(2).map((c) => c.id)];
+r = await call('/api/columns/reorder', 'POST', { order: newOrder });
+r = await call('/api/state');
+const after = r.json.columns.filter((c) => c.project_id === 'prj_hege').sort((a, b) => a.position - b.position);
+check('Spalten umsortiert', after[0].id === hegeCols[1].id && after[1].id === hegeCols[0].id,
+  after.slice(0, 2).map((c) => c.title));
+
+// Einzelfeld-Aktualisierung (Autospeicherung im Detail)
+r = await call('/api/tasks/' + mover.id, 'PATCH', { assignee_id: 'usr_joachim' });
+r = await call('/api/state');
+check('Einzelfeld gespeichert', r.json.tasks.find((t) => t.id === mover.id).assignee_id === 'usr_joachim');
+r = await call('/api/tasks/' + mover.id, 'PATCH', { due_date: null });
+r = await call('/api/state');
+check('Feld auf leer setzbar', r.json.tasks.find((t) => t.id === mover.id).due_date === null);
+
+// Projekte tragen kein Symbolfeld mehr
+r = await call('/api/state');
+check('Kein Emoji-Feld an Projekten', r.json.projects.every((p) => !('emoji' in p)), Object.keys(r.json.projects[0] || {}));
+
 // Health
 r = await call('/healthz');
 check('Healthcheck', r.status === 200 && r.json.ok === true);
