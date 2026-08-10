@@ -1,0 +1,17 @@
+{
+  "name": "mikdaten",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Mikdaten — Projekt- und Objektsteuerung für die Immobilienverwaltung (Cloudflare Workers + D1)",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "seed": "node scripts/gen-seed.mjs > seed.sql",
+    "test": "node scripts/build.mjs && node --experimental-sqlite scripts/local-test.mjs",
+    "dev": "node scripts/build.mjs && node --experimental-sqlite scripts/local-server.mjs",
+    "deploy": "node scripts/build.mjs && wrangler deploy",
+    "db:schema": "wrangler d1 execute mikdaten --remote --file=schema.sql",
+    "db:seed": "wrangler d1 execute mikdaten --remote --file=seed.sql"
+  },
+  "engines": { "node": ">=22.5" }
+}

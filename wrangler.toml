@@ -1,0 +1,12 @@
+name = "mikdaten"
+main = "dist/worker.js"
+compatibility_date = "2026-06-01"
+workers_dev = true
+
+[observability]
+enabled = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "mikdaten"
+database_id = "995b2b67-7dda-4a12-89be-bd34950ee794"
