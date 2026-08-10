@@ -97,18 +97,17 @@ const I = {
   pin: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-5.7 7-11a7 7 0 1 0-14 0c0 5.3 7 11 7 11z"/><circle cx="12" cy="10" r="2.4"/></svg>',
 };
 
-const LOGO = (size = 32) => `<svg class="logo-mark" style="width:${size}px;height:${size}px" viewBox="0 0 48 48" aria-hidden="true">
-<rect width="48" height="48" rx="10" fill="#14504F"/>
-<path d="M9 36V24.6l7.5-7.5 7.5 7.1 7.5-7.1 7.5 7.5V36" fill="none" stroke="#fff" stroke-width="3" stroke-linejoin="miter"/>
-<path d="M24 36v-7" stroke="#fff" stroke-width="3"/></svg>`;
+const LOGO = (size = 28) => `<svg class="logo-mark" style="width:${size}px;height:${Math.round(size * 0.75)}px" viewBox="0 0 30 22" fill="none" stroke="currentColor" aria-hidden="true">
+<path d="M2 20.5V8.9l6.5-6.4 6.5 6.2 6.5-6.2 6.5 6.4v11.6" stroke-width="1.8" stroke-linejoin="miter"/>
+<path d="M0 21.2h30" stroke-width="1.2"/></svg>`;
 
 /* ------------------------------------------------------------- Stammdaten */
 
 const LABELS = [
-  ['Ankauf', '#A6392A'], ['Verkauf', '#2F6B45'], ['Vermietung', '#2A5C8A'],
-  ['Sanierung', '#8A6212'], ['Finanzierung', '#5B4B8A'], ['Recht', '#40474C'],
-  ['Behörde', '#166B6B'], ['Marketing', '#9A4A6B'], ['Besichtigung', '#9A5B3A'],
-  ['Notar', '#5B6472'], ['Buchhaltung', '#3E6B3A'], ['Technik', '#7C6A55'],
+  ['Ankauf', '#B23A2C'], ['Verkauf', '#3F7A55'], ['Vermietung', '#3A5F88'],
+  ['Sanierung', '#8A6A1F'], ['Finanzierung', '#5F5486'], ['Recht', '#3D4045'],
+  ['Behörde', '#2F6E6B'], ['Marketing', '#8A4A6A'], ['Besichtigung', '#9A5B3A'],
+  ['Notar', '#5A5F68'], ['Buchhaltung', '#4A6B45'], ['Technik', '#7A6A58'],
 ];
 const LABEL_COLOR = Object.fromEntries(LABELS);
 
@@ -152,7 +151,7 @@ const EVENT_TYPES = [
 ];
 const EVENT_TYPE_NAME = Object.fromEntries(EVENT_TYPES);
 
-const COLORS = ['#14504F', '#2A5C8A', '#A6392A', '#8A6212', '#2F6B45', '#5B4B8A', '#7C6A55', '#40474C', '#166B6B', '#9A5B3A'];
+const COLORS = ['#3F4247', '#3A5F88', '#B23A2C', '#8A6A1F', '#3F7A55', '#5F5486', '#7A6A58', '#2F6E6B', '#8A4A6A', '#5A5F68'];
 
 /* ------------------------------------------------------------------ State */
 
@@ -416,7 +415,7 @@ function renderSidebar() {
   $('#sidebar').innerHTML = `
     <div class="sidebar-head">
       <div class="logo">
-        ${LOGO(34)}
+        ${LOGO(26)}
         <div class="logo-word">Mikdaten<small>Immobilien</small></div>
       </div>
     </div>
@@ -555,7 +554,7 @@ function taskCard(t) {
 
   return `<article class="tcard ${done ? 'done' : ''}" data-task="${esc(t.id)}" data-act="task-open" tabindex="0">
     <span class="tcard-handle" title="Zum Verschieben ziehen">${I.drag}</span>
-    ${labels.length ? `<div class="tcard-labels">${labels.map((l) => `<span class="tlabel" style="background:${hexA(LABEL_COLOR[l] || '#9aa0ab', 0.14)};color:${esc(LABEL_COLOR[l] || '#9aa0ab')}">${esc(l)}</span>`).join('')}</div>` : ''}
+    ${labels.length ? `<div class="tcard-labels">${labels.map((l) => `<span class="tlabel"><i style="background:${esc(LABEL_COLOR[l] || '#9aa0a6')}"></i>${esc(l)}</span>`).join('')}</div>` : ''}
     <div class="tcard-title">${esc(t.title)}</div>
     ${prop ? `<div class="tcard-obj">${I.pin}<span class="trunc">${esc(prop.title)}</span></div>` : ''}
     <div class="tcard-meta">
@@ -917,7 +916,7 @@ function taskTable(tasks) {
         <td>${u ? `<div class="row" style="gap:6px">${avatar(u, 'sm')}<span class="small trunc">${esc(u.name)}</span></div>` : '<span class="faint">—</span>'}</td>
         <td class="small ${!done && d !== null && d < 0 ? 'bold' : ''}" style="${!done && d !== null && d < 0 ? 'color:var(--red)' : ''}">${t.due_date ? esc(fmtDate(t.due_date, { day: '2-digit', month: '2-digit', year: '2-digit' })) : '—'}</td>
         <td class="small">${esc(PRIO_NAME[t.priority] || '')}</td>
-        <td>${(t.labels || []).slice(0, 3).map((l) => `<span class="badge" style="background:${hexA(LABEL_COLOR[l] || '#999', 0.13)};color:${esc(LABEL_COLOR[l] || '#999')}">${esc(l)}</span>`).join(' ')}</td>
+        <td>${(t.labels || []).slice(0, 3).map((l) => `<span class="tlabel"><i style="background:${esc(LABEL_COLOR[l] || '#9aa0a6')}"></i>${esc(l)}</span>`).join(' ')}</td>
         <td class="small">${t.amount ? esc(EUR.format(t.amount)) : '—'}</td>
       </tr>`;
     }).join('')}</tbody></table></div>`;
@@ -1175,7 +1174,7 @@ function viewWelcome(root) {
 
   root.innerHTML = `<div class="content"><div class="page" style="max-width:1000px">
     <div class="start-hero">
-      ${LOGO(52)}
+      ${LOGO(40)}
       <h2>Willkommen bei Mikdaten, ${esc(S.me.name.split(' ')[0])}.</h2>
       <p>Die Arbeitsumgebung ist leer und wartet auf eure echten Daten.
          Am schnellsten geht es so: erst die Objekte erfassen, dann Projekte darauf aufsetzen.</p>
@@ -1202,7 +1201,7 @@ function viewWelcome(root) {
 }
 
 function dealColor(k) {
-  return { ankauf: '#8A6212', bestand: '#2A5C8A', vermarktung: '#A6392A', verkauft: '#2F6B45', vermietet: '#5B4B8A' }[k] || '#979da3';
+  return { ankauf: '#8A6A1F', bestand: '#3A5F88', vermarktung: '#B23A2C', verkauft: '#3F7A55', vermietet: '#5F5486' }[k] || '#9AA0A6';
 }
 
 function donut(parts, total) {
@@ -1294,7 +1293,7 @@ function viewProjects(root) {
       const prop = propertyById(p.property_id);
       const mem = projectMembers(p.id);
       return `<div class="obj-card" data-act="go" data-route="board/${esc(p.id)}" style="${p.archived ? 'opacity:.6' : ''}">
-        <div style="height:6px;background:linear-gradient(90deg,${esc(p.color)},${hexA(p.color, 0.4)})"></div>
+        <div style="height:3px;background:${esc(p.color)}"></div>
         <div class="obj-body">
           <div class="row" style="margin-bottom:8px">
             <span class="badge" style="background:${hexA(p.color, 0.14)};color:${esc(p.color)}">${esc(PROJECT_TYPE_NAME[p.type] || p.type)}</span>
@@ -1358,7 +1357,7 @@ function propertyCard(p) {
   const d = DEAL_MAP[p.deal] || ['', p.deal, ''];
   const price = p.deal === 'ankauf' ? p.purchase_price : (p.asking_price || p.purchase_price);
   const bg = p.image_url
-    ? `background-image:linear-gradient(180deg,rgba(0,0,0,.05),rgba(0,0,0,.28)),url('${esc(p.image_url)}')`
+    ? `background-image:url('${esc(p.image_url)}')`
     : '';
   return `<div class="obj-card" data-act="property-open" data-id="${esc(p.id)}">
     <div class="obj-photo" style="${bg}">
@@ -1400,7 +1399,7 @@ function viewProperty(root) {
   root.innerHTML = `<div class="content"><div class="page">
     <button class="btn btn-ghost btn-sm" data-act="go" data-route="objekte" style="margin-bottom:12px">‹ Alle Objekte</button>
     <div class="card" style="overflow:hidden;margin-bottom:18px">
-      <div class="obj-photo" style="height:190px;border-radius:0;${p.image_url ? `background-image:linear-gradient(180deg,rgba(0,0,0,.05),rgba(0,0,0,.3)),url('${esc(p.image_url)}')` : ''}">
+      <div class="obj-photo" style="height:170px;border-radius:0;${p.image_url ? `background-image:url('${esc(p.image_url)}')` : ''}">
         ${!p.image_url ? `<div style="position:absolute;inset:0;display:grid;place-items:center;color:var(--faint);opacity:.4">${I.building.replace('width="16" height="16"', 'width="58" height="58"')}</div>` : ''}
       </div>
       <div class="card-pad">

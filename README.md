@@ -85,11 +85,17 @@ Text ausgedrückt.
 
 ## Gestaltung
 
-Papierweißer Grund, Petrol als Leitfarbe, Backstein für Warnungen, Serifen in
-den Überschriften. Bewusst keine Farbverläufe, keine Leuchtschatten und nur
-Haarlinien statt weicher Kartenschatten — die Oberfläche soll nach Werkzeug
-aussehen, nicht nach Produktseite. Die Anmeldeseite zeigt ein Millimeterraster
-mit einer Gebäudeansicht statt eines Farbverlaufs.
+Weiß, Graustufen, Haarlinien. Keine Leitfarbe auf großen Flächen, keine
+Farbverläufe, keine Schlagschatten. Farbe trägt ausschließlich Bedeutung:
+Fristen, Objektstatus, Labels und Personen — jeweils als kleiner Punkt oder
+kurzer Text, nie als Fläche. Primäre Schaltflächen sind schwarz, alles andere
+ist weiß mit Rahmen. Radien zwischen 4 und 8 Pixeln, Zahlen laufen
+tabellarisch.
+
+Die Marke ist ein bloßes Zeichen ohne Kachel: zwei Dachkanten, die zusammen
+ein M und eine Häuserzeile ergeben, darunter eine Grundlinie. Es nimmt die
+Textfarbe an und funktioniert dadurch in beiden Designs. Die Anmeldeseite ist
+ein schlichtes zentriertes Formular auf Weiß.
 
 ## Datenbestand
 
