@@ -452,6 +452,236 @@ check('Datei aus R2 entfernt', MEDIA._size() === r2Before - 1, MEDIA._size());
 r = await call('/api/state');
 check('Verknüpfte Links funktionieren weiter', r.json.documents.some((d) => d.url && !d.storage_key));
 
+/* ------------------------------------------------------------ MCP + OAuth */
+
+console.log('\n  — MCP-Server —');
+
+const raw = (path, init = {}) => worker.fetch(new Request('https://x.dev' + path, init), env);
+
+r = await call('/.well-known/oauth-authorization-server');
+check('OAuth-Metadaten veröffentlicht', r.status === 200 && r.json.token_endpoint === 'https://x.dev/oauth/token', r.json);
+check('Nur PKCE mit S256', r.json && r.json.code_challenge_methods_supported.join() === 'S256', r.json?.code_challenge_methods_supported);
+
+r = await call('/.well-known/oauth-protected-resource');
+check('Ressourcen-Metadaten veröffentlicht', r.status === 200 && r.json.resource === 'https://x.dev/mcp', r.json);
+
+r = await call('/tools.json');
+check('Werkzeugkatalog ohne Anmeldung', r.status === 200 && Array.isArray(r.json.tools) && r.json.tools.length >= 20, r.json?.tools?.length);
+check('Katalog nennt den Server', r.json.server?.name === 'mikdaten', r.json.server);
+check('Nur-Lese-Werkzeuge markiert', r.json.tools.some((t) => t.annotations?.readOnlyHint === true));
+check('Alle Werkzeuge mit Schema', r.json.tools.every((t) => t.description && t.inputSchema?.type === 'object'));
+check('Werkzeugnamen eindeutig', new Set(r.json.tools.map((t) => t.name)).size === r.json.tools.length);
+
+const rpc = async (method, params, token) => {
+  const res = await raw('/mcp', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...(token ? { authorization: 'Bearer ' + token } : {}) },
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+  });
+  const text = await res.text();
+  return { status: res.status, headers: res.headers, json: text ? JSON.parse(text) : null };
+};
+
+let m = await rpc('initialize', { protocolVersion: '2025-06-18', capabilities: {} });
+check('Handshake ohne Anmeldung', m.status === 200 && m.json.result.serverInfo.name === 'mikdaten', m.json);
+check('Protokollversion gemeldet', m.json.result.protocolVersion === '2025-06-18', m.json.result.protocolVersion);
+check('Nutzungshinweise mitgeliefert', typeof m.json.result.instructions === 'string' && m.json.result.instructions.length > 40);
+
+m = await rpc('tools/list', {});
+check('Werkzeuge ohne Token gesperrt', m.status === 401, m.status);
+check('Hinweis auf die Anmeldung im Header', (m.headers.get('www-authenticate') || '').includes('resource_metadata'), m.headers.get('www-authenticate'));
+
+m = await rpc('tools/list', {}, 'mkd_gefaelscht');
+check('Falscher Token abgewiesen', m.status === 401, m.status);
+
+// Dynamische Registrierung
+r = await call('/oauth/register', 'POST', { client_name: 'Testklient', redirect_uris: ['https://klient.test/cb'] });
+const clientId = r.json.client_id;
+check('Client registriert', r.status === 201 && /^mkc_/.test(clientId || ''), r.json);
+r = await call('/oauth/register', 'POST', { client_name: 'Ohne Ziel' });
+check('Registrierung ohne Weiterleitung abgewiesen', r.status === 400, r.status);
+
+// PKCE
+const verifier = 'pruefwort-' + 'a'.repeat(50);
+const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
+const challenge = Buffer.from(digest).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const authQuery = `client_id=${clientId}&redirect_uri=${encodeURIComponent('https://klient.test/cb')}`
+  + `&response_type=code&code_challenge=${challenge}&code_challenge_method=S256&state=xyz`;
+
+let res = await raw('/oauth/authorize?' + authQuery);
+let body = await res.text();
+check('Anmeldeseite wird gezeigt', res.status === 200 && body.includes('Testklient') && body.includes('name="password"'), res.status);
+
+res = await raw('/oauth/authorize?client_id=' + clientId + '&redirect_uri=' + encodeURIComponent('https://boese.test/cb') + '&response_type=code&code_challenge=' + challenge + '&code_challenge_method=S256');
+check('Fremde Weiterleitung abgewiesen', res.status === 400, res.status);
+
+res = await raw('/oauth/authorize?client_id=' + clientId + '&redirect_uri=' + encodeURIComponent('https://klient.test/cb') + '&response_type=code');
+check('Ohne PKCE abgewiesen', res.status === 400, res.status);
+
+const post = (path, form) => raw(path, {
+  method: 'POST',
+  headers: { 'content-type': 'application/x-www-form-urlencoded' },
+  body: new URLSearchParams(form).toString(),
+});
+
+res = await post('/oauth/authorize', {
+  client_id: clientId, redirect_uri: 'https://klient.test/cb', response_type: 'code',
+  code_challenge: challenge, code_challenge_method: 'S256', state: 'xyz',
+  login: 'christian.jonas', password: 'falsch',
+});
+body = await res.text();
+check('Falsches Passwort bleibt auf der Seite', res.status === 401 && body.includes('stimmen nicht'), res.status);
+
+res = await post('/oauth/authorize', {
+  client_id: clientId, redirect_uri: 'https://klient.test/cb', response_type: 'code',
+  code_challenge: challenge, code_challenge_method: 'S256', state: 'xyz',
+  login: 'christian.jonas', password: 'Mikdaten#Immo2026',
+});
+const redirectTo = res.headers.get('location') || '';
+const code = new URL(redirectTo).searchParams.get('code');
+check('Weiterleitung mit Code', res.status === 302 && !!code, redirectTo);
+check('State bleibt erhalten', new URL(redirectTo).searchParams.get('state') === 'xyz');
+
+res = await post('/oauth/token', {
+  grant_type: 'authorization_code', code, client_id: clientId,
+  redirect_uri: 'https://klient.test/cb', code_verifier: 'falscher-verifier',
+});
+check('Falscher code_verifier abgewiesen', res.status === 400, res.status);
+
+// Der Code wurde damit verbraucht — neuer Durchlauf für den echten Token
+res = await post('/oauth/authorize', {
+  client_id: clientId, redirect_uri: 'https://klient.test/cb', response_type: 'code',
+  code_challenge: challenge, code_challenge_method: 'S256',
+  login: 'christian.jonas', password: 'Mikdaten#Immo2026',
+});
+const code2 = new URL(res.headers.get('location')).searchParams.get('code');
+res = await post('/oauth/token', {
+  grant_type: 'authorization_code', code: code2, client_id: clientId,
+  redirect_uri: 'https://klient.test/cb', code_verifier: verifier,
+});
+const tokenBody = await res.json();
+const token = tokenBody.access_token;
+check('Token ausgestellt', res.status === 200 && /^mkd_/.test(token || ''), tokenBody);
+check('Bearer-Typ', tokenBody.token_type === 'Bearer');
+
+res = await post('/oauth/token', {
+  grant_type: 'authorization_code', code: code2, client_id: clientId,
+  redirect_uri: 'https://klient.test/cb', code_verifier: verifier,
+});
+check('Code nur einmal einlösbar', res.status === 400, res.status);
+
+// Werkzeuge
+m = await rpc('tools/list', {}, token);
+const toolNames = m.json.result.tools.map((t) => t.name);
+check('Werkzeugliste mit Token', m.status === 200 && toolNames.length >= 20, toolNames.length);
+
+const callTool = async (name, args) => {
+  const out = await rpc('tools/call', { name, arguments: args || {} }, token);
+  const text = out.json?.result?.content?.[0]?.text;
+  let parsed = null;
+  try { parsed = JSON.parse(text); } catch { /* Fehlertext */ }
+  return { isError: !!out.json?.result?.isError, text, data: parsed, raw: out };
+};
+
+let t = await callTool('uebersicht');
+check('Übersicht liefert Kennzahlen', !t.isError && typeof t.data.offene_aufgaben === 'number', t.text);
+
+t = await callTool('projekte_auflisten');
+const prjId = t.data.projekte?.[0]?.id;
+check('Projekte auflisten', !t.isError && !!prjId, t.text);
+
+t = await callTool('projekt_details', { projekt_id: prjId });
+const mcpColId = t.data.spalten?.[0]?.id;
+check('Projektdetails mit Spalten', !t.isError && !!mcpColId, t.text);
+
+t = await callTool('aufgabe_anlegen', { projekt_id: prjId, titel: 'Grundbuchauszug anfordern', prioritaet: 'hoch', zustaendig: 'joachim.kluge', faellig: '2026-09-01' });
+const newTask = t.data?.aufgabe_id;
+check('Aufgabe über MCP angelegt', !t.isError && !!newTask, t.text);
+
+t = await callTool('aufgabe_details', { aufgabe_id: newTask });
+check('Aufgabendetails abrufbar', !t.isError && t.data.titel === 'Grundbuchauszug anfordern', t.text);
+check('Zuständigkeit nach Benutzername aufgelöst', t.data.zustaendig === 'Joachim Kluge', t.data?.zustaendig);
+
+t = await callTool('aufgabe_kommentieren', { aufgabe_id: newTask, text: 'Notar ist informiert.' });
+check('Kommentar geschrieben', !t.isError, t.text);
+
+t = await callTool('checkliste_ergaenzen', { aufgabe_id: newTask, punkte: ['Auszug bestellen', 'Kopie ablegen'] });
+check('Checkliste ergänzt', !t.isError && t.data.angelegt === 2, t.text);
+
+t = await callTool('aufgabe_verschieben', { aufgabe_id: newTask, spalte_id: mcpColId });
+check('Aufgabe verschoben', !t.isError, t.text);
+
+t = await callTool('aufgabe_erledigen', { aufgabe_id: newTask });
+check('Aufgabe erledigt', !t.isError && t.data.gilt_als_erledigt === true, t.text);
+
+t = await callTool('aufgaben_suchen', { text: 'Grundbuch', status: 'erledigt' });
+check('Volltextsuche findet die Aufgabe', !t.isError && t.data.aufgaben.some((x) => x.id === newTask), t.text);
+
+t = await callTool('objekte_auflisten');
+const objId = t.data.objekte?.[0]?.id;
+check('Objekte auflisten', !t.isError && !!objId, t.text);
+
+t = await callTool('objekt_details', { objekt_id: objId });
+check('Objektdetails abrufbar', !t.isError && t.data.id === objId && Array.isArray(t.data.aufgaben), t.text);
+
+t = await callTool('objekt_anlegen', { bezeichnung: 'Testhaus Nord', ort: 'Kiel', art: 'mehrfamilienhaus', kaufpreis: 900000, kaltmiete: 4500 });
+check('Objekt angelegt', !t.isError && !!t.data.objekt?.id, t.text);
+check('Bruttorendite berechnet', Math.abs(t.data.objekt.bruttorendite_prozent - 6) < 0.1, t.data.objekt?.bruttorendite_prozent);
+
+t = await callTool('kontakt_anlegen', { name: 'Testmakler GmbH', rolle: 'makler', email: 'kontakt@test.de' });
+check('Kontakt angelegt', !t.isError && !!t.data.kontakt_id, t.text);
+
+t = await callTool('termin_anlegen', { titel: 'Notartermin', datum: '2026-09-15', art: 'notar', uhrzeit: '10:00' });
+check('Termin angelegt', !t.isError && !!t.data.termin_id, t.text);
+
+t = await callTool('termine_auflisten', { bis: '2026-12-31' });
+check('Termine auflisten', !t.isError && t.data.eintraege.some((x) => x.titel === 'Notartermin'), t.text);
+
+t = await callTool('suche', { text: 'Testhaus' });
+check('Globale Suche findet das Objekt', !t.isError && t.data.objekte?.length >= 1, t.text);
+
+t = await callTool('team_auslastung');
+check('Team-Auslastung', !t.isError && Array.isArray(t.data.team), t.text);
+
+t = await callTool('aktivitaet', { anzahl: 5 });
+check('Aktivitätsprotokoll', !t.isError && Array.isArray(t.data.eintraege), t.text);
+
+t = await callTool('aufgabe_details', { aufgabe_id: 'gibt-es-nicht' });
+check('Unbekannte Aufgabe meldet Fehler', t.isError === true, t.text);
+
+m = await rpc('tools/call', { name: 'kein_werkzeug', arguments: {} }, token);
+check('Unbekanntes Werkzeug → JSON-RPC-Fehler', m.json.error?.code === -32602, m.json);
+
+// Ressourcen und Prompts
+m = await rpc('resources/list', {}, token);
+check('Ressourcen gelistet', m.json.result.resources.length === 3, m.json.result?.resources?.length);
+m = await rpc('resources/read', { uri: 'mikdaten://uebersicht' }, token);
+check('Ressource lesbar', !!m.json.result.contents[0].text, m.json);
+m = await rpc('prompts/list', {}, token);
+check('Prompts gelistet', m.json.result.prompts.length === 3, m.json.result?.prompts?.length);
+m = await rpc('prompts/get', { name: 'objekt_dossier', arguments: { objekt: 'Hegestraße' } }, token);
+check('Prompt füllt Argumente ein', m.json.result.messages[0].content.text.includes('Hegestraße'), m.json);
+
+// Benachrichtigungen und ping
+res = await raw('/mcp', {
+  method: 'POST',
+  headers: { 'content-type': 'application/json' },
+  body: JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }),
+});
+check('Benachrichtigung wird bestätigt', res.status === 202, res.status);
+m = await rpc('ping', {}, token);
+check('Ping beantwortet', m.status === 200 && m.json.result && !m.json.error, m.json);
+
+// Verwaltung im Konto
+r = await call('/api/mcp/tokens');
+check('Verbundene Anwendung sichtbar', r.status === 200 && r.json.tokens.some((x) => x.client_name === 'Testklient'), r.json);
+const tokenId = r.json.tokens[0].id;
+check('Letzte Nutzung erfasst', !!r.json.tokens[0].last_used_at, r.json.tokens[0]);
+r = await call('/api/mcp/tokens/' + tokenId, 'DELETE');
+check('Verbindung getrennt', r.status === 200, r.status);
+m = await rpc('tools/list', {}, token);
+check('Getrennter Token wirkt sofort', m.status === 401, m.status);
+
 // Health
 r = await call('/healthz');
 check('Healthcheck', r.status === 200 && r.json.ok === true);

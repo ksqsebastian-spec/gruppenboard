@@ -269,6 +269,9 @@ const IMAGE_TYPES = {
 };
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
 
+/* ------------------------------------------------------------- MCP-Server */
+__MCP_MODULE__
+
 async function handleApi(request, env, url) {
   const db = env.DB;
   const path = url.pathname.replace(/^\/api/, '');
@@ -353,6 +356,20 @@ async function handleApi(request, env, url) {
     await updateRow(db, 'users', me.id, { password: await hashPassword(next) });
     await db.prepare('DELETE FROM sessions WHERE user_id = ?').bind(me.id).run();
     return json({ ok: true }, { headers: { 'set-cookie': sessionCookie('', 0) } });
+  }
+
+  /* --- MCP-Zugänge --- */
+  if (path === '/mcp/tokens' && method === 'GET') {
+    const rows = await db.prepare(
+      'SELECT id, client_name, created_at, last_used_at FROM oauth_tokens WHERE user_id = ? ORDER BY created_at DESC',
+    ).bind(me.id).all();
+    return json({ tokens: rows.results || [] });
+  }
+
+  if (path.startsWith('/mcp/tokens/') && method === 'DELETE') {
+    const id = path.slice('/mcp/tokens/'.length);
+    await db.prepare('DELETE FROM oauth_tokens WHERE id = ? AND user_id = ?').bind(id, me.id).run();
+    return json({ ok: true });
   }
 
   /* --- Projekte --- */
@@ -812,6 +829,49 @@ export default {
     }
 
     if (url.pathname === '/healthz') return json({ ok: true, ts: nowIso() });
+
+    /* --- MCP-Server (läuft in diesem Worker) --- */
+    const origin = url.origin;
+
+    if (url.pathname === '/mcp' || url.pathname === '/mcp/') {
+      if (!env.DB) return new Response('Datenbank nicht verbunden', { status: 500 });
+      try {
+        return await handleMcp(request, env, url, origin);
+      } catch (err) {
+        console.error('MCP-Fehler', err && err.stack);
+        return rpcError(null, -32603, 'Serverfehler.');
+      }
+    }
+
+    if (url.pathname === '/tools.json' || url.pathname === '/mcp/tools.json') return toolsCatalog();
+
+    if (url.pathname === '/.well-known/oauth-authorization-server'
+      || url.pathname === '/.well-known/openid-configuration') {
+      return mcpJson(oauthMetadata(origin), { headers: { 'cache-control': 'public, max-age=300' } });
+    }
+
+    if (url.pathname === '/.well-known/oauth-protected-resource'
+      || url.pathname === '/.well-known/oauth-protected-resource/mcp') {
+      return mcpJson({
+        resource: origin + '/mcp',
+        authorization_servers: [origin],
+        scopes_supported: ['mikdaten'],
+        bearer_methods_supported: ['header'],
+      }, { headers: { 'cache-control': 'public, max-age=300' } });
+    }
+
+    if (url.pathname.startsWith('/oauth/')) {
+      if (!env.DB) return new Response('Datenbank nicht verbunden', { status: 500 });
+      if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
+      try {
+        const res = await handleOAuth(request, env, url, origin);
+        if (res) return res;
+      } catch (err) {
+        console.error('OAuth-Fehler', err && err.stack);
+        return mcpJson({ error: 'server_error' }, { status: 500 });
+      }
+      return new Response('Nicht gefunden', { status: 404 });
+    }
 
     // Bilder aus R2 — nur für angemeldete Personen
     if (url.pathname.startsWith('/media/')) {

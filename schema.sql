@@ -1,5 +1,8 @@
 -- Mikdaten · Datenbankschema (Cloudflare D1 / SQLite)
 
+DROP TABLE IF EXISTS oauth_tokens;
+DROP TABLE IF EXISTS oauth_codes;
+DROP TABLE IF EXISTS oauth_clients;
 DROP TABLE IF EXISTS activity;
 DROP TABLE IF EXISTS photos;
 DROP TABLE IF EXISTS documents;
@@ -221,3 +224,33 @@ CREATE TABLE activity (
   created_at  TEXT NOT NULL
 );
 CREATE INDEX idx_activity_created ON activity(created_at);
+
+-- MCP-Zugang (OAuth 2.1 mit PKCE, dynamische Client-Registrierung)
+
+CREATE TABLE oauth_clients (
+  client_id     TEXT PRIMARY KEY,
+  client_name   TEXT NOT NULL,
+  redirect_uris TEXT NOT NULL,
+  created_at    TEXT NOT NULL
+);
+
+CREATE TABLE oauth_codes (
+  code           TEXT PRIMARY KEY,
+  client_id      TEXT NOT NULL,
+  user_id        TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  redirect_uri   TEXT NOT NULL,
+  code_challenge TEXT NOT NULL,
+  scope          TEXT,
+  expires_at     TEXT NOT NULL
+);
+
+CREATE TABLE oauth_tokens (
+  id           TEXT PRIMARY KEY,
+  token_hash   TEXT NOT NULL UNIQUE,
+  client_id    TEXT NOT NULL,
+  client_name  TEXT,
+  user_id      TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at   TEXT NOT NULL,
+  last_used_at TEXT
+);
+CREATE INDEX idx_oauth_tokens_user ON oauth_tokens(user_id);

@@ -1729,6 +1729,24 @@ function viewSettings(root) {
       </form>
     </div>
 
+    <div class="card card-pad" style="margin-bottom:16px">
+      <b>KI-Anbindung (MCP)</b>
+      <p class="small muted" style="margin:4px 0 12px">
+        Mikdaten stellt einen MCP-Server bereit. Damit können Assistenten wie Claude auf Board,
+        Objekte, Kontakte und Termine zugreifen — mit deinen Rechten.
+      </p>
+      <div class="field">
+        <label>Server-Adresse</label>
+        <div class="row" style="gap:8px">
+          <input class="input" id="mcp-url" readonly value="${esc(location.origin)}/mcp" style="font-family:var(--mono);font-size:13px">
+          <button class="btn btn-soft" type="button" data-act="mcp-copy">Kopieren</button>
+        </div>
+      </div>
+      <div class="sep"></div>
+      <b class="small">Verbundene Anwendungen</b>
+      <div id="mcp-tokens" class="small muted" style="margin-top:8px">Wird geladen …</div>
+    </div>
+
     <div class="card card-pad">
       <b>Darstellung</b>
       <div class="row" style="margin-top:12px;gap:8px">
@@ -1752,6 +1770,8 @@ function viewSettings(root) {
     }, 'Profil gespeichert.');
   });
 
+  loadMcpTokens();
+
   $('#password-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const fd = Object.fromEntries(new FormData(e.target).entries());
@@ -1762,6 +1782,30 @@ function viewSettings(root) {
       setTimeout(() => location.reload(), 900);
     });
   });
+}
+
+async function loadMcpTokens() {
+  const box = $('#mcp-tokens');
+  if (!box) return;
+  let list = [];
+  try {
+    list = (await api('/mcp/tokens')).tokens || [];
+  } catch {
+    box.textContent = 'Zugänge konnten nicht geladen werden.';
+    return;
+  }
+  if (!$('#mcp-tokens')) return;
+  if (!list.length) {
+    box.innerHTML = 'Noch keine Anwendung verbunden.';
+    return;
+  }
+  box.innerHTML = list.map((t) => `<div class="row" style="justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)">
+    <div style="min-width:0">
+      <div class="bold" style="color:var(--ink)">${esc(t.client_name || 'Unbekannte Anwendung')}</div>
+      <div class="tiny faint">verbunden ${fmtDate(t.created_at)}${t.last_used_at ? ` · zuletzt genutzt ${fmtRelative(t.last_used_at)}` : ''}</div>
+    </div>
+    <button class="btn btn-ghost btn-sm" data-act="mcp-revoke" data-id="${esc(t.id)}">Trennen</button>
+  </div>`).join('');
 }
 
 /* ------------------------------------------------------------ Leerzustand */
@@ -2797,6 +2841,20 @@ const ACTIONS = {
   'cal-next': () => { S.calMonth = new Date(S.calMonth.getFullYear(), S.calMonth.getMonth() + 1, 1); renderView(); },
   'cal-today': () => { const d = new Date(); S.calMonth = new Date(d.getFullYear(), d.getMonth(), 1); renderView(); },
   'cal-day': (el, ev) => { if (ev.target === el || ev.target.classList.contains('d')) actEventModal(null, el.dataset.date); },
+
+  'mcp-copy': () => {
+    const input = $('#mcp-url');
+    if (!input) return;
+    input.select();
+    navigator.clipboard?.writeText(input.value).then(
+      () => toast('Adresse kopiert.'),
+      () => toast('Bitte von Hand kopieren.', 'err'),
+    );
+  },
+  'mcp-revoke': (el) => guard(async () => {
+    await api('/mcp/tokens/' + encodeURIComponent(el.dataset.id), 'DELETE');
+    await loadMcpTokens();
+  }, 'Verbindung getrennt.'),
 
   'pick-avatar': (el) => {
     $('#avatar-input').value = el.dataset.avatar;

@@ -77,6 +77,18 @@ Auswahl (Fuchs, Eule, Katze, Hund, Hase, Igel, Möwe, Wal, Bär, Waschbär,
 Biber, Schaf). Die Bilder sind 12×12-Raster in `src/pixel-avatars.js` und
 werden zur Laufzeit als SVG erzeugt — keine Bilddateien, kein Netzwerkabruf.
 
+**MCP-Server** — die Plattform lässt sich von KI-Assistenten wie Claude direkt
+bedienen. Der Server läuft im selben Worker unter `/mcp` und bietet 27
+Werkzeuge: 13 lesende (Übersicht, Projekte, Aufgaben, Objekte, Kontakte,
+Termine, Dokumente, Teamauslastung, Aktivität, globale Suche) und 14
+schreibende (Projekte, Aufgaben, Verschieben, Erledigen, Kommentare,
+Checklisten, Spalten, Objekte, Kontakte, Termine, Dokumente). Dazu drei
+Ressourcen und drei vorbereitete Arbeitsaufträge (Wochenüberblick,
+Objektdossier, Fristenprüfung). Anmeldung über OAuth 2.1 mit PKCE gegen
+denselben Zugang wie die Oberfläche — jede Anfrage läuft mit den Rechten der
+angemeldeten Person. Verbundene Anwendungen stehen unter *Einstellungen →
+KI-Anbindung* und lassen sich dort einzeln trennen.
+
 **Weiteres** — Team-Übersicht mit Auslastung, Aktivitätsverlauf, Befehlspalette
 (⌘K / Strg+K), helles und dunkles Design, Tastaturkürzel (`n` neue Aufgabe,
 `g`+`d`/`m`/`o`/`k` zum Springen), vollständig responsiv bis 390 px.
@@ -139,6 +151,12 @@ werden alle bestehenden Sitzungen dieser Person beendet.
   und prüft den Pfad gegen Traversal; Uploads werden auf Bildtypen und 12 MB
   begrenzt
 - Die Seite ist per `robots`-Meta von der Indexierung ausgenommen
+- MCP-Zugriffe laufen über OAuth 2.1 mit PKCE (nur S256, kein impliziter Fluss).
+  Autorisierungscodes sind zehn Minuten gültig und nur einmal einlösbar; die
+  Weiterleitungsadresse muss bei der Registrierung hinterlegt worden sein.
+  Zugriffstoken liegen nur als SHA-256-Hash in der Datenbank und lassen sich in
+  den Einstellungen jederzeit widerrufen. Ohne gültiges Token beantwortet `/mcp`
+  nur `initialize` und `ping`.
 
 ## Aufbau
 
@@ -148,18 +166,19 @@ src/index.html       Shell inkl. Anmeldeseite und Logo
 src/styles.css       Design-System (Tokens, Komponenten, helles/dunkles Design)
 src/app.js           Single-Page-Anwendung (Vanilla JS, keine Abhängigkeiten)
 src/pixel-avatars.js Zwölf Pixel-Tiere und die Bildmarke als Pixelraster
+src/mcp.js           MCP-Server: Werkzeuge, Ressourcen, Prompts, OAuth 2.1
 schema.sql           Datenbankschema
 seed.sql             Erzeugt aus scripts/gen-seed.mjs (Konten + Beispieldaten)
 scripts/build.mjs    Bettet HTML/CSS/JS in dist/worker.js ein
 scripts/gen-seed.mjs Erzeugt seed.sql inkl. Passwort-Hashes
-scripts/local-test.mjs   109 Integrationstests gegen node:sqlite und R2-Attrappe
+scripts/local-test.mjs   169 Integrationstests gegen node:sqlite und R2-Attrappe
 scripts/local-server.mjs Lokaler Server auf Port 8788
 ```
 
 ## Entwicklung
 
 ```bash
-npm run test    # Build + 109 Integrationstests (node:sqlite als D1-Ersatz)
+npm run test    # Build + 169 Integrationstests (node:sqlite als D1-Ersatz)
 npm run dev     # http://127.0.0.1:8788, Daten im Arbeitsspeicher
 npm run build   # dist/worker.js erzeugen
 ```
@@ -210,4 +229,23 @@ Schreibende Anfragen brauchen `X-Mikdaten: 1`.
 | POST | `/photos/upload?property_id=…` | Bild-Upload nach R2 (Rohdaten im Body) |
 | PATCH/DELETE | `/photos/:id` | Titelbild setzen, Bildunterschrift, Löschen |
 | GET | `/media/<key>` (ohne `/api`) | Bild- und Dateiauslieferung, nur mit Sitzung; `?dl=1` erzwingt den Download |
+| GET/DELETE | `/mcp/tokens[/:id]` | Verbundene MCP-Anwendungen anzeigen und trennen |
 | GET | `/healthz` | Statusprüfung (ohne Anmeldung) |
+
+## MCP
+
+Endpunkt: `https://mikdaten.ksqsebastian.workers.dev/mcp` (Streamable HTTP,
+Protokollversion `2025-06-18`).
+
+| Pfad | Zweck |
+|---|---|
+| `/mcp` | JSON-RPC-Endpunkt. `initialize` und `ping` ohne Anmeldung, alles Weitere mit Bearer-Token |
+| `/tools.json` | Werkzeugkatalog ohne Anmeldung — für Übersichtsseiten |
+| `/.well-known/oauth-protected-resource` | Verweist auf den Autorisierungsserver (RFC 9728) |
+| `/.well-known/oauth-authorization-server` | Metadaten des Autorisierungsservers |
+| `/oauth/register` | Dynamische Client-Registrierung (RFC 7591) |
+| `/oauth/authorize` | Anmeldeseite und Freigabe |
+| `/oauth/token` | Code gegen Token, PKCE-Prüfung mit S256 |
+
+In Claude unter *Einstellungen → Connectors* die Endpunkt-URL eintragen; die
+Registrierung und der Anmeldefluss laufen von selbst.

@@ -16,10 +16,14 @@ const html = read('src/index.html')
   .replace('__APP_CSS__', () => css)
   .replace('__APP_JS__', () => js);
 
-const worker = read('src/worker.js').replace('__APP_HTML__', () => JSON.stringify(html));
+const mcp = read('src/mcp.js');
+
+const worker = read('src/worker.js')
+  .replace('__MCP_MODULE__', () => mcp)
+  .replace('__APP_HTML__', () => JSON.stringify(html));
 
 mkdirSync(resolve(root, 'dist'), { recursive: true });
 writeFileSync(resolve(root, 'dist/worker.js'), worker);
 
 const kb = (s) => (Buffer.byteLength(s, 'utf8') / 1024).toFixed(1) + ' kB';
-console.log(`dist/worker.js  ${kb(worker)}   (CSS ${kb(css)}, JS ${kb(js)}, HTML ${kb(html)})`);
+console.log(`dist/worker.js  ${kb(worker)}   (CSS ${kb(css)}, JS ${kb(js)}, HTML ${kb(html)}, MCP ${kb(mcp)})`);
