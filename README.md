@@ -54,6 +54,12 @@ Vollbildansicht mit Pfeiltastennavigation. Bilder liegen im R2-Bucket
 `mikdaten-media` und werden nur an angemeldete Personen ausgeliefert; beim
 Löschen eines Objekts werden sie mit entfernt
 
+**Dateiablage** — Dokumente lassen sich als Datei hochladen (PDF, Bilder,
+Word, Excel, PowerPoint, OpenDocument, Text, CSV, ZIP; bis 25 MB) oder
+weiterhin als Link hinterlegen. Ablage an Objekt, Projekt oder Aufgabe, per
+Knopf oder Drag & Drop. PDF und Bilder öffnen im Browser, alles andere lädt
+herunter
+
 **Kontakte** — nach Rolle gruppiert: Eigentümer, Käufer, Mieter, Interessent,
 Makler, Handwerker, Notar, Bank, Hausverwaltung, Behörde
 
@@ -65,11 +71,25 @@ Eigentümerversammlung, Frist
 Portfoliowert, Kaltmiete), Projektfortschritt, Portfolio-Verteilung als Donut,
 Teamauslastung, 14-Tage-Verlauf, nächste Termine, Aktivitätsprotokoll
 
+**Profil** — Name, E-Mail, Position, Telefon und Farbe sind änderbar. Als
+Profilbild stehen die Initialen oder zwölf handgesetzte Pixel-Tiere zur
+Auswahl (Fuchs, Eule, Katze, Hund, Hase, Igel, Möwe, Wal, Bär, Waschbär,
+Biber, Schaf). Die Bilder sind 12×12-Raster in `src/pixel-avatars.js` und
+werden zur Laufzeit als SVG erzeugt — keine Bilddateien, kein Netzwerkabruf.
+
 **Weiteres** — Team-Übersicht mit Auslastung, Aktivitätsverlauf, Befehlspalette
 (⌘K / Strg+K), helles und dunkles Design, Tastaturkürzel (`n` neue Aufgabe,
 `g`+`d`/`m`/`o`/`k` zum Springen), vollständig responsiv bis 390 px.
 Die Oberfläche kommt ohne Emojis aus — Zustände werden über Farbe, Form und
 Text ausgedrückt.
+
+## Gestaltung
+
+Papierweißer Grund, Petrol als Leitfarbe, Backstein für Warnungen, Serifen in
+den Überschriften. Bewusst keine Farbverläufe, keine Leuchtschatten und nur
+Haarlinien statt weicher Kartenschatten — die Oberfläche soll nach Werkzeug
+aussehen, nicht nach Produktseite. Die Anmeldeseite zeigt ein Millimeterraster
+mit einer Gebäudeansicht statt eines Farbverlaufs.
 
 ## Datenbestand
 
@@ -115,18 +135,19 @@ src/worker.js        Worker: JSON-API auf D1, Auth, Sitzungen, Auslieferung
 src/index.html       Shell inkl. Anmeldeseite und Logo
 src/styles.css       Design-System (Tokens, Komponenten, helles/dunkles Design)
 src/app.js           Single-Page-Anwendung (Vanilla JS, keine Abhängigkeiten)
+src/pixel-avatars.js Zwölf Pixel-Tiere als 12x12-Raster
 schema.sql           Datenbankschema
 seed.sql             Erzeugt aus scripts/gen-seed.mjs (Konten + Beispieldaten)
 scripts/build.mjs    Bettet HTML/CSS/JS in dist/worker.js ein
 scripts/gen-seed.mjs Erzeugt seed.sql inkl. Passwort-Hashes
-scripts/local-test.mjs   86 Integrationstests gegen node:sqlite und R2-Attrappe
+scripts/local-test.mjs   109 Integrationstests gegen node:sqlite und R2-Attrappe
 scripts/local-server.mjs Lokaler Server auf Port 8788
 ```
 
 ## Entwicklung
 
 ```bash
-npm run test    # Build + 86 Integrationstests (node:sqlite als D1-Ersatz)
+npm run test    # Build + 109 Integrationstests (node:sqlite als D1-Ersatz)
 npm run dev     # http://127.0.0.1:8788, Daten im Arbeitsspeicher
 npm run build   # dist/worker.js erzeugen
 ```
@@ -163,7 +184,7 @@ Schreibende Anfragen brauchen `X-Mikdaten: 1`.
 |---|---|---|
 | POST | `/auth/login` · `/auth/logout` | An- und Abmelden |
 | GET | `/state` | Gesamter Datenbestand in einer Antwort |
-| PATCH | `/account` · POST `/account/password` | Profil, Passwort |
+| PATCH | `/account` · POST `/account/password` | Profil inkl. E-Mail und Profilbild, Passwort |
 | POST/PATCH/DELETE | `/projects[/:id]` | Projekte (Anlegen erzeugt Standardspalten) |
 | POST/PATCH/DELETE | `/columns[/:id]`, POST `/columns/reorder` | Spalten |
 | POST/PATCH/DELETE | `/tasks[/:id]`, POST `/tasks/move` | Aufgaben; `move` nimmt `position` (einzelne Karte) oder `order` (Spalte neu nummerieren) |
@@ -173,7 +194,8 @@ Schreibende Anfragen brauchen `X-Mikdaten: 1`.
 | POST/PATCH/DELETE | `/contacts[/:id]` | Kontakte |
 | POST/PATCH/DELETE | `/events[/:id]` | Termine |
 | POST/DELETE | `/documents[/:id]` | Dokumentlinks |
+| POST | `/documents/upload?property_id=…` | Dateiupload nach R2 (Rohdaten im Body) |
 | POST | `/photos/upload?property_id=…` | Bild-Upload nach R2 (Rohdaten im Body) |
 | PATCH/DELETE | `/photos/:id` | Titelbild setzen, Bildunterschrift, Löschen |
-| GET | `/media/<key>` (ohne `/api`) | Bildauslieferung, nur mit Sitzung |
+| GET | `/media/<key>` (ohne `/api`) | Bild- und Dateiauslieferung, nur mit Sitzung; `?dl=1` erzwingt den Download |
 | GET | `/healthz` | Statusprüfung (ohne Anmeldung) |

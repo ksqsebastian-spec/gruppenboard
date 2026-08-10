@@ -85,6 +85,10 @@ const I = {
   euro: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 5.5A6.5 6.5 0 0 0 7.5 12 6.5 6.5 0 0 0 17 18.5M4 10.5h8M4 14h8"/></svg>',
   ruler: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="8" width="19" height="8" rx="2"/><path d="M7 8v3M11 8v4M15 8v3M19 8v4"/></svg>',
   bed: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18v-8M3 13h18v5M21 18v-3.5A2.5 2.5 0 0 0 18.5 12H12V8.5"/><circle cx="7" cy="9.5" r="1.8"/></svg>',
+  upload: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V5M7.5 9.5 12 5l4.5 4.5M5 19h14"/></svg>',
+  file: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg>',
+  link: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 13.5a4 4 0 0 0 5.7 0l2.6-2.6a4 4 0 0 0-5.7-5.7L11.6 6.7"/><path d="M13.5 10.5a4 4 0 0 0-5.7 0l-2.6 2.6a4 4 0 0 0 5.7 5.7l1.5-1.5"/></svg>',
+  download: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19h14"/></svg>',
   chevron: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5 8 12l7 7"/></svg>',
   arrowLeft: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 4 12l7 7M4 12h16"/></svg>',
   arrowRight: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m13 5 7 7-7 7M20 12H4"/></svg>',
@@ -93,19 +97,18 @@ const I = {
   pin: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-5.7 7-11a7 7 0 1 0-14 0c0 5.3 7 11 7 11z"/><circle cx="12" cy="10" r="2.4"/></svg>',
 };
 
-const LOGO = (size = 34) => `<svg class="logo-mark" style="width:${size}px;height:${size}px" viewBox="0 0 48 48" aria-hidden="true">
-<defs><linearGradient id="mkg${size}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FF8A3D"/><stop offset="1" stop-color="#FF3D6E"/></linearGradient></defs>
-<rect width="48" height="48" rx="13" fill="url(#mkg${size})"/>
-<path d="M10 35V25.2l7.2-7.2 6.8 6.8 6.8-6.8 7.2 7.2V35" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M24 35v-6" stroke="#fff" stroke-width="3.4" stroke-linecap="round"/></svg>`;
+const LOGO = (size = 32) => `<svg class="logo-mark" style="width:${size}px;height:${size}px" viewBox="0 0 48 48" aria-hidden="true">
+<rect width="48" height="48" rx="10" fill="#14504F"/>
+<path d="M9 36V24.6l7.5-7.5 7.5 7.1 7.5-7.1 7.5 7.5V36" fill="none" stroke="#fff" stroke-width="3" stroke-linejoin="miter"/>
+<path d="M24 36v-7" stroke="#fff" stroke-width="3"/></svg>`;
 
 /* ------------------------------------------------------------- Stammdaten */
 
 const LABELS = [
-  ['Ankauf', '#FF4E5B'], ['Verkauf', '#12855F'], ['Vermietung', '#2F6DF6'],
-  ['Sanierung', '#B26A00'], ['Finanzierung', '#7A4DDB'], ['Recht', '#4B5563'],
-  ['Behörde', '#0E8A8A'], ['Marketing', '#E2569C'], ['Besichtigung', '#FF8A3D'],
-  ['Notar', '#5B6472'], ['Buchhaltung', '#3E8E3E'], ['Technik', '#7C6A55'],
+  ['Ankauf', '#A6392A'], ['Verkauf', '#2F6B45'], ['Vermietung', '#2A5C8A'],
+  ['Sanierung', '#8A6212'], ['Finanzierung', '#5B4B8A'], ['Recht', '#40474C'],
+  ['Behörde', '#166B6B'], ['Marketing', '#9A4A6B'], ['Besichtigung', '#9A5B3A'],
+  ['Notar', '#5B6472'], ['Buchhaltung', '#3E6B3A'], ['Technik', '#7C6A55'],
 ];
 const LABEL_COLOR = Object.fromEntries(LABELS);
 
@@ -149,7 +152,7 @@ const EVENT_TYPES = [
 ];
 const EVENT_TYPE_NAME = Object.fromEntries(EVENT_TYPES);
 
-const COLORS = ['#FF4E5B', '#FF8A3D', '#F5B301', '#12855F', '#0E8A8A', '#2F6DF6', '#7A4DDB', '#E2569C', '#5B6472', '#7C6A55'];
+const COLORS = ['#14504F', '#2A5C8A', '#A6392A', '#8A6212', '#2F6B45', '#5B4B8A', '#7C6A55', '#40474C', '#166B6B', '#9A5B3A'];
 
 /* ------------------------------------------------------------------ State */
 
@@ -272,6 +275,73 @@ function pickPhotos(propertyId) {
   input.click();
 }
 
+const MAX_DOC_UPLOAD = 25 * 1024 * 1024;
+
+async function uploadDocuments(target, files) {
+  const list = Array.from(files || []).filter(Boolean);
+  if (!list.length) return;
+  const query = Object.entries(target)
+    .filter(([, v]) => v)
+    .map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('&');
+
+  let done = 0;
+  toast(list.length === 1 ? 'Datei wird hochgeladen …' : `${list.length} Dateien werden hochgeladen …`);
+  for (const file of list) {
+    if (file.size > MAX_DOC_UPLOAD) { toast(`${file.name}: größer als 25 MB.`, 'err'); continue; }
+    try {
+      const res = await fetch(`/api/documents/upload?${query}`, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'x-mikdaten': '1',
+          'content-type': file.type || 'application/octet-stream',
+          'x-filename': encodeURIComponent(file.name),
+        },
+        body: file,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Fehler ${res.status}`);
+      }
+      done++;
+    } catch (e) {
+      toast(`${file.name}: ${e.message}`, 'err');
+    }
+  }
+  if (done) {
+    await refresh();
+    render();
+    toast(done === 1 ? 'Datei abgelegt.' : `${done} Dateien abgelegt.`);
+  }
+}
+
+function pickDocuments(target) {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.multiple = true;
+  input.addEventListener('change', () => uploadDocuments(target, input.files));
+  input.click();
+}
+
+const fileSize = (n) => {
+  if (!n) return '';
+  if (n < 1024) return n + ' B';
+  if (n < 1024 * 1024) return Math.round(n / 1024) + ' kB';
+  return (n / 1048576).toFixed(1).replace('.', ',') + ' MB';
+};
+
+function documentRow(d) {
+  const href = d.storage_key ? `/media/${esc(d.storage_key)}` : esc(d.url || '#');
+  const meta = [d.filename && d.size ? fileSize(d.size) : '', d.storage_key ? 'Datei' : 'Link'].filter(Boolean).join(' · ');
+  return `<div class="doc-row">
+    <span class="doc-icon">${d.storage_key ? I.file : I.link}</span>
+    <a class="doc-title trunc" href="${href}" target="_blank" rel="noopener">${esc(d.title)}</a>
+    <span class="doc-meta">${esc(meta)}</span>
+    ${d.storage_key ? `<a class="doc-dl" href="${href}?dl=1&name=${encodeURIComponent(d.filename || d.title)}" title="Herunterladen">${I.download}</a>` : ''}
+    <button class="doc-del" data-act="doc-delete" data-id="${esc(d.id)}" title="Entfernen">${I.trash}</button>
+  </div>`;
+}
+
 /* ----------------------------------------------------------------- Toasts */
 
 function toast(msg, kind = '') {
@@ -301,7 +371,11 @@ async function guard(fn, okMsg) {
 /* ------------------------------------------------------------ Bausteine */
 
 function avatar(user, cls = '') {
-  if (!user) return `<div class="avatar ${cls}" style="background:#b9bec6" title="Nicht zugewiesen">–</div>`;
+  if (!user) return `<div class="avatar ${cls}" style="background:var(--line-strong)" title="Nicht zugewiesen">–</div>`;
+  const pixel = user.avatar && user.avatar.startsWith('pixel:') ? user.avatar.slice(6) : null;
+  if (pixel && PIXEL_ANIMALS[pixel]) {
+    return `<div class="avatar pixel ${cls}" style="background-image:url(&quot;${pixelAvatarUrl(pixel)}&quot;)" title="${esc(user.name)}"></div>`;
+  }
   return `<div class="avatar ${cls}" style="background:${esc(user.color)}" title="${esc(user.name)}">${esc(user.initials)}</div>`;
 }
 
@@ -1128,7 +1202,7 @@ function viewWelcome(root) {
 }
 
 function dealColor(k) {
-  return { ankauf: '#E08D00', bestand: '#2F6DF6', vermarktung: '#FF4E5B', verkauft: '#12855F', vermietet: '#7A4DDB' }[k] || '#9aa0ab';
+  return { ankauf: '#8A6212', bestand: '#2A5C8A', vermarktung: '#A6392A', verkauft: '#2F6B45', vermietet: '#5B4B8A' }[k] || '#979da3';
 }
 
 function donut(parts, total) {
@@ -1343,7 +1417,7 @@ function viewProperty(root) {
           <div class="row" style="gap:8px">
             <button class="btn btn-brand btn-sm" data-act="photo-pick" data-id="${esc(p.id)}">${I.camera} Fotos</button>
             <button class="btn btn-soft btn-sm" data-act="property-edit" data-id="${esc(p.id)}">${I.edit} Bearbeiten</button>
-            <button class="btn btn-soft btn-sm" data-act="doc-new" data-property="${esc(p.id)}">${I.doc} Dokument</button>
+            <button class="btn btn-soft btn-sm" data-act="doc-upload" data-property="${esc(p.id)}">${I.upload} Datei</button>
           </div>
         </div>
         <div class="sep"></div>
@@ -1415,16 +1489,19 @@ function viewProperty(root) {
           </div>`).join('') : '<div class="card-pad faint small">Keine Termine.</div>'}</div>
 
         <div class="section-title">Dokumente (${relDocs.length})</div>
-        <div class="card">${relDocs.length ? relDocs.map((d) => `
-          <div class="list-item"><span class="faint">${I.doc}</span>
-            <a class="trunc small" style="flex:1" href="${esc(d.url)}" target="_blank" rel="noopener">${esc(d.title)}</a>
-            <button class="btn btn-ghost btn-sm btn-icon" data-act="doc-delete" data-id="${esc(d.id)}">${I.trash}</button>
-          </div>`).join('') : '<div class="card-pad faint small">Keine Dokumente hinterlegt.</div>'}</div>
+        <div class="card doc-zone" id="doc-drop" data-property="${esc(p.id)}">
+          ${relDocs.length ? relDocs.map(documentRow).join('') : '<div class="card-pad faint small">Noch nichts abgelegt. Dateien hierher ziehen oder unten hochladen.</div>'}
+          <div class="doc-actions">
+            <button class="btn btn-soft btn-sm" data-act="doc-upload" data-property="${esc(p.id)}">${I.upload} Datei hochladen</button>
+            <button class="btn btn-ghost btn-sm" data-act="doc-new" data-property="${esc(p.id)}">${I.link} Link</button>
+          </div>
+        </div>
       </div>
     </div>
   </div></div>`;
 
   wirePhotoDrop(p.id);
+  wireDocDrop();
 }
 
 /* Dateien direkt auf die Galerie ziehen */
@@ -1450,6 +1527,27 @@ function wirePhotoDrop(propertyId) {
     depth = 0;
     zone.classList.remove('drop-over');
     uploadPhotos(propertyId, e.dataTransfer.files);
+  });
+}
+
+/* Dateien auf die Dokumentenliste ziehen */
+function wireDocDrop() {
+  const zone = $('#doc-drop');
+  if (!zone) return;
+  const target = {
+    property_id: zone.dataset.property || null,
+    task_id: zone.dataset.task || null,
+    project_id: zone.dataset.project || null,
+  };
+  let depth = 0;
+  const hasFiles = (e) => e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files');
+  zone.addEventListener('dragenter', (e) => { if (!hasFiles(e)) return; e.preventDefault(); depth++; zone.classList.add('drop-over'); });
+  zone.addEventListener('dragover', (e) => { if (hasFiles(e)) e.preventDefault(); });
+  zone.addEventListener('dragleave', () => { depth = Math.max(0, depth - 1); if (!depth) zone.classList.remove('drop-over'); });
+  zone.addEventListener('drop', (e) => {
+    if (!hasFiles(e)) return;
+    e.preventDefault(); depth = 0; zone.classList.remove('drop-over');
+    uploadDocuments(target, e.dataTransfer.files);
   });
 }
 
@@ -1587,16 +1685,35 @@ function viewSettings(root) {
       <form id="profile-form">
         <div class="grid-2">
           <div class="field"><label>Name</label><input class="input" name="name" value="${esc(u.name)}" required></div>
-          <div class="field"><label>Position</label><input class="input" name="job_title" value="${esc(u.job_title || '')}" placeholder="z. B. Geschäftsführung"></div>
+          <div class="field"><label>E-Mail</label><input class="input" type="email" name="email" value="${esc(u.email)}" required></div>
         </div>
         <div class="grid-2">
+          <div class="field"><label>Position</label><input class="input" name="job_title" value="${esc(u.job_title || '')}" placeholder="z. B. Geschäftsführung"></div>
           <div class="field"><label>Telefon</label><input class="input" name="phone" value="${esc(u.phone || '')}" placeholder="+49 …"></div>
-          <div class="field"><label>Profilfarbe</label>
-            <div class="swatches" style="padding-top:5px">
-              ${COLORS.map((c) => `<button type="button" class="swatch ${u.color.toLowerCase() === c.toLowerCase() ? 'on' : ''}" style="background:${c}" data-act="pick-color" data-color="${c}"></button>`).join('')}
-            </div>
-            <input type="hidden" name="color" id="color-input" value="${esc(u.color)}">
+        </div>
+
+        <div class="field">
+          <label>Profilbild</label>
+          <div class="avatar-picker">
+            <button type="button" class="avatar-option ${!u.avatar ? 'on' : ''}" data-act="pick-avatar" data-avatar="" title="Initialen">
+              <span class="avatar lg" style="background:${esc(u.color)}">${esc(u.initials)}</span>
+              <em>Initialen</em>
+            </button>
+            ${Object.entries(PIXEL_ANIMALS).map(([key, a]) => `
+              <button type="button" class="avatar-option ${u.avatar === 'pixel:' + key ? 'on' : ''}" data-act="pick-avatar" data-avatar="pixel:${key}" title="${esc(a.name)}">
+                <span class="avatar pixel lg" style="background-image:url(&quot;${pixelAvatarUrl(key)}&quot;)"></span>
+                <em>${esc(a.name)}</em>
+              </button>`).join('')}
           </div>
+          <input type="hidden" name="avatar" id="avatar-input" value="${esc(u.avatar || '')}">
+        </div>
+
+        <div class="field">
+          <label>Farbe für Initialen und Diagramme</label>
+          <div class="swatches" style="padding-top:5px">
+            ${COLORS.map((c) => `<button type="button" class="swatch ${u.color.toLowerCase() === c.toLowerCase() ? 'on' : ''}" style="background:${c}" data-act="pick-color" data-color="${c}"></button>`).join('')}
+          </div>
+          <input type="hidden" name="color" id="color-input" value="${esc(u.color)}">
         </div>
         <button class="btn btn-primary" type="submit">Profil speichern</button>
       </form>
@@ -1630,6 +1747,7 @@ function viewSettings(root) {
     e.preventDefault();
     const fd = Object.fromEntries(new FormData(e.target).entries());
     await guard(async () => {
+      if (fd.avatar === '') fd.avatar = null;
       const r = await api('/account', 'PATCH', fd);
       S.me = r.user;
       await refresh();
@@ -1687,7 +1805,7 @@ function taskDrawer(t) {
         <button class="btn btn-ghost btn-icon btn-sm" data-act="menu" data-menu="task">${I.dots}</button>
         ${S.menuOpen === 'task' ? `<div class="menu">
           <button data-act="task-duplicate" data-task="${esc(t.id)}">${I.doc} Duplizieren</button>
-          <button data-act="doc-new" data-task="${esc(t.id)}">${I.doc} Dokument verknüpfen</button>
+          <button data-act="doc-upload" data-task="${esc(t.id)}">${I.upload} Datei hochladen</button>
           <div class="sepm"></div>
           <button class="danger" data-act="task-delete" data-task="${esc(t.id)}">${I.trash} Aufgabe löschen</button>
         </div>` : ''}
@@ -1751,10 +1869,14 @@ function taskDrawer(t) {
         <button class="btn btn-soft btn-sm" type="submit">${I.plus}</button>
       </form>
 
-      ${docs.length ? `<div class="section-title">Dokumente</div>
-        ${docs.map((d) => `<div class="row" style="padding:6px 0"><span class="faint">${I.doc}</span>
-          <a class="link small trunc" style="flex:1" href="${esc(d.url)}" target="_blank" rel="noopener">${esc(d.title)}</a>
-          <button class="btn btn-ghost btn-sm btn-icon" data-act="doc-delete" data-id="${esc(d.id)}">${I.trash}</button></div>`).join('')}` : ''}
+      <div class="section-title">Dateien${docs.length ? ` (${docs.length})` : ''}</div>
+      <div class="doc-zone" id="doc-drop" data-task="${esc(t.id)}">
+        ${docs.map(documentRow).join('')}
+        <div class="doc-actions">
+          <button class="btn btn-soft btn-sm" data-act="doc-upload" data-task="${esc(t.id)}">${I.upload} Datei hochladen</button>
+          <button class="btn btn-ghost btn-sm" data-act="doc-new" data-task="${esc(t.id)}">${I.link} Link</button>
+        </div>
+      </div>
 
       <div class="section-title">Kommentare (${comments.length})</div>
       <form id="comment-form" class="row" style="gap:8px;align-items:flex-start">
@@ -1942,6 +2064,7 @@ function renderLayer() {
   const ta = $('#t-title');
   if (ta) autoGrow(ta);
   wireTaskAutosave();
+  wireDocDrop();
 }
 
 /* Jede Änderung im Aufgaben-Detail geht sofort raus — kein Speichern-Knopf,
@@ -2661,6 +2784,14 @@ const ACTIONS = {
     S.menuOpen = null;
     actDocModal({ property_id: el.dataset.property || null, task_id: el.dataset.task || null, project_id: el.dataset.project || null });
   },
+  'doc-upload': (el) => {
+    S.menuOpen = null;
+    pickDocuments({
+      property_id: el.dataset.property || null,
+      task_id: el.dataset.task || null,
+      project_id: el.dataset.project || null,
+    });
+  },
   'doc-delete': async (el) => {
     await guard(async () => { await api('/documents/' + el.dataset.id, 'DELETE'); await refresh(); render(); }, 'Gelöscht.');
   },
@@ -2670,6 +2801,11 @@ const ACTIONS = {
   'cal-today': () => { const d = new Date(); S.calMonth = new Date(d.getFullYear(), d.getMonth(), 1); renderView(); },
   'cal-day': (el, ev) => { if (ev.target === el || ev.target.classList.contains('d')) actEventModal(null, el.dataset.date); },
 
+  'pick-avatar': (el) => {
+    $('#avatar-input').value = el.dataset.avatar;
+    $$('.avatar-option').forEach((b) => b.classList.remove('on'));
+    el.classList.add('on');
+  },
   'pick-color': (el) => {
     $('#color-input').value = el.dataset.color;
     $$('.swatch', el.parentNode).forEach((s) => s.classList.remove('on'));

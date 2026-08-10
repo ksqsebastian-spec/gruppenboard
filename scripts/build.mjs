@@ -10,7 +10,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p) => readFileSync(resolve(root, p), 'utf8');
 
 const css = read('src/styles.css');
-const js = read('src/app.js');
+const js = read('src/pixel-avatars.js') + '\n' + read('src/app.js');
 
 const html = read('src/index.html')
   .replace('__APP_CSS__', () => css)

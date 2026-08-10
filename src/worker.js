@@ -148,6 +148,7 @@ const publicUser = (u) => ({
   phone: u.phone,
   initials: u.initials,
   color: u.color,
+  avatar: u.avatar,
 });
 
 async function loadState(db) {
@@ -235,6 +236,29 @@ const PROPERTY_FIELDS = [
 const CONTACT_FIELDS = ['name', 'role', 'company', 'email', 'phone', 'street', 'zip', 'city', 'property_id', 'notes'];
 const EVENT_FIELDS = ['title', 'type', 'date', 'time', 'duration', 'location', 'project_id', 'property_id', 'contact_id', 'owner_id', 'notes'];
 
+const DOC_TYPES = {
+  'application/pdf': 'pdf',
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+  'image/gif': 'gif',
+  'image/heic': 'heic',
+  'image/svg+xml': 'svg',
+  'text/plain': 'txt',
+  'text/csv': 'csv',
+  'application/zip': 'zip',
+  'application/msword': 'doc',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+  'application/vnd.ms-excel': 'xls',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
+  'application/vnd.ms-powerpoint': 'ppt',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'pptx',
+  'application/vnd.oasis.opendocument.text': 'odt',
+  'application/vnd.oasis.opendocument.spreadsheet': 'ods',
+};
+const MAX_DOC_BYTES = 25 * 1024 * 1024;
+const INLINE_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp', 'image/gif', 'text/plain'];
+
 const IMAGE_TYPES = {
   'image/jpeg': 'jpg',
   'image/png': 'png',
@@ -249,7 +273,7 @@ async function handleApi(request, env, url) {
   const db = env.DB;
   const path = url.pathname.replace(/^\/api/, '');
   const method = request.method.toUpperCase();
-  const isBinary = path === '/photos/upload';
+  const isBinary = path === '/photos/upload' || path === '/documents/upload';
   const body = method === 'GET' || method === 'DELETE' || isBinary
     ? {}
     : await request.json().catch(() => ({}));
@@ -304,8 +328,18 @@ async function handleApi(request, env, url) {
   }
 
   if (path === '/account' && method === 'PATCH') {
-    const data = pick(body, ['name', 'job_title', 'phone', 'color']);
+    const data = pick(body, ['name', 'job_title', 'phone', 'color', 'avatar', 'email']);
     if (data.name) data.initials = initialsOf(data.name);
+    if (Object.prototype.hasOwnProperty.call(data, 'email')) {
+      const email = String(data.email || '').trim().toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return fail(400, 'Bitte eine gültige E-Mail-Adresse angeben.');
+      const taken = await db.prepare('SELECT id FROM users WHERE lower(email) = ? AND id <> ?').bind(email, me.id).first();
+      if (taken) return fail(409, 'Diese E-Mail-Adresse wird bereits verwendet.');
+      data.email = email;
+    }
+    if (data.avatar !== undefined && data.avatar !== null && !/^pixel:[a-z]{2,20}$/.test(String(data.avatar))) {
+      return fail(400, 'Unbekanntes Profilbild.');
+    }
     await updateRow(db, 'users', me.id, data);
     const fresh = await db.prepare('SELECT * FROM users WHERE id = ?').bind(me.id).first();
     return json({ user: publicUser(fresh) });
@@ -683,6 +717,49 @@ async function handleApi(request, env, url) {
   }
 
   /* --- Dokumente --- */
+  if (path === '/documents/upload' && method === 'POST') {
+    if (!env.MEDIA) return fail(500, 'Dateispeicher ist nicht verbunden.');
+    const type = (request.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
+    const ext = DOC_TYPES[type];
+    if (!ext) return fail(415, 'Dieser Dateityp ist nicht zugelassen.');
+
+    const bytes = await request.arrayBuffer();
+    if (!bytes.byteLength) return fail(400, 'Die Datei ist leer.');
+    if (bytes.byteLength > MAX_DOC_BYTES) return fail(413, 'Die Datei ist größer als 25 MB.');
+
+    let filename = 'Datei';
+    try { filename = decodeURIComponent(request.headers.get('x-filename') || '').slice(0, 200) || 'Datei'; } catch { /* Standard */ }
+
+    const projectId = url.searchParams.get('project_id') || null;
+    const propertyId = url.searchParams.get('property_id') || null;
+    const taskId = url.searchParams.get('task_id') || null;
+    if (!projectId && !propertyId && !taskId) return fail(400, 'Die Datei braucht einen Bezug.');
+
+    const id = uid('doc');
+    const key = `dokumente/${propertyId || projectId || taskId}/${id}.${ext}`;
+    await env.MEDIA.put(key, bytes, {
+      httpMetadata: { contentType: type, cacheControl: 'private, max-age=31536000, immutable' },
+      customMetadata: { uploadedBy: me.id },
+    });
+    await insertRow(db, 'documents', {
+      id,
+      title: filename.replace(/\.[a-z0-9]{1,6}$/i, '').slice(0, 200) || filename,
+      url: null,
+      storage_key: key,
+      filename,
+      content_type: type,
+      size: bytes.byteLength,
+      kind: url.searchParams.get('kind') || 'sonstige',
+      project_id: projectId,
+      property_id: propertyId,
+      task_id: taskId,
+      user_id: me.id,
+      created_at: nowIso(),
+    });
+    await logActivity(db, me, 'upload', 'document', id, `Datei hochgeladen: ${filename}`, projectId);
+    return json({ ok: true, id, url: `/media/${key}` });
+  }
+
   if (path === '/documents' && method === 'POST') {
     const id = uid('doc');
     await insertRow(db, 'documents', {
@@ -699,6 +776,8 @@ async function handleApi(request, env, url) {
     return json({ ok: true, id });
   }
   if ((m = path.match(/^\/documents\/([\w-]+)$/)) && method === 'DELETE') {
+    const doc = await db.prepare('SELECT storage_key FROM documents WHERE id = ?').bind(m[1]).first();
+    if (doc?.storage_key && env.MEDIA) await env.MEDIA.delete(doc.storage_key);
     await db.prepare('DELETE FROM documents WHERE id = ?').bind(m[1]).run();
     return json({ ok: true });
   }
@@ -750,8 +829,11 @@ export default {
       object.writeHttpMetadata(headers);
       headers.set('etag', object.httpEtag);
       headers.set('cache-control', 'private, max-age=31536000, immutable');
-      headers.set('content-disposition', 'inline');
       headers.set('x-content-type-options', 'nosniff');
+      const type = headers.get('content-type') || '';
+      const download = url.searchParams.get('dl') === '1' || !INLINE_TYPES.includes(type.split(';')[0].trim());
+      const name = (url.searchParams.get('name') || key.split('/').pop()).replace(/[^\w.\- ]+/g, '_').slice(0, 120);
+      headers.set('content-disposition', `${download ? 'attachment' : 'inline'}; filename="${name}"`);
       if (request.headers.get('if-none-match') === object.httpEtag) {
         return new Response(null, { status: 304, headers });
       }

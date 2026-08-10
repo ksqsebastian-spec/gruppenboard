@@ -52,9 +52,9 @@ const insert = (table, obj) => {
 /* ------------------------------------------------------------- Personen */
 
 const USERS = [
-  { id: 'usr_christian', name: 'Christian Jonas', username: 'christian.jonas', email: 'christian.jonas@mikdaten.de', job_title: 'Geschäftsführung / Ankauf', initials: 'CJ', color: '#FF4E5B', phone: '+49 40 300 1201' },
-  { id: 'usr_joachim', name: 'Joachim Kluge', username: 'joachim.kluge', email: 'joachim.kluge@mikdaten.de', job_title: 'Kaufmännische Leitung / Vertrieb', initials: 'JK', color: '#2F6DF6', phone: '+49 40 300 1202' },
-  { id: 'usr_mikdat', name: 'Mikdat Emir', username: 'mikdat.emir', email: 'mikdat.emir@mikdaten.de', job_title: 'Objekt- & Bestandsmanagement', initials: 'ME', color: '#12855F', phone: '+49 40 300 1203' },
+  { id: 'usr_christian', name: 'Christian Jonas', username: 'christian.jonas', email: 'christian.jonas@mikdaten.de', job_title: 'Geschäftsführung / Ankauf', initials: 'CJ', color: '#14504F', phone: '+49 40 300 1201' },
+  { id: 'usr_joachim', name: 'Joachim Kluge', username: 'joachim.kluge', email: 'joachim.kluge@mikdaten.de', job_title: 'Kaufmännische Leitung / Vertrieb', initials: 'JK', color: '#2A5C8A', phone: '+49 40 300 1202' },
+  { id: 'usr_mikdat', name: 'Mikdat Emir', username: 'mikdat.emir', email: 'mikdat.emir@mikdaten.de', job_title: 'Objekt- & Bestandsmanagement', initials: 'ME', color: '#2F6B45', phone: '+49 40 300 1203' },
 ];
 
 /* -------------------------------------------------------------- Objekte */
@@ -88,11 +88,11 @@ const CONTACTS = [
 const COLNAMES = ['Backlog', 'Zu erledigen', 'In Arbeit', 'Prüfung', 'Erledigt'];
 
 const PROJECTS = [
-  { id: 'prj_hege', name: 'Ankauf MFH Hegestraße', description: 'Due Diligence, Finanzierung und Beurkundung für das Mehrfamilienhaus in Eppendorf.', type: 'ankauf', color: '#FF4E5B', property_id: 'obj_hege', lead_id: 'usr_christian', volume: 3450000, budget: 3620000, start: -34, due: 46 },
-  { id: 'prj_poel', name: 'Vermarktung ETW Poelchaukamp', description: 'Exposé, Besichtigungen und Verkauf der 3,5-Zimmer-Wohnung in Winterhude.', type: 'verkauf', color: '#12855F', property_id: 'obj_poel', lead_id: 'usr_joachim', volume: 795000, budget: 12000, start: -21, due: 62 },
-  { id: 'prj_bahr', name: 'Sanierung Bahrenfelder Straße', description: 'Strangsanierung, Heizungstausch und Aufwertung der Treppenhäuser.', type: 'sanierung', color: '#FF8A3D', property_id: 'obj_bahr', lead_id: 'usr_mikdat', volume: 480000, budget: 520000, start: -12, due: 180 },
-  { id: 'prj_best', name: 'Bestandsverwaltung 2026', description: 'Laufende Aufgaben aus Bestand: Nebenkosten, Mieterwechsel, Wartungen, ETVs.', type: 'verwaltung', color: '#2F6DF6', property_id: null, lead_id: 'usr_mikdat', volume: null, budget: null, start: -180, due: 143 },
-  { id: 'prj_kirch', name: 'Ankaufsprüfung Kirchwerder', description: 'Bauvoranfrage, Bodengutachten und Kalkulation für das Baugrundstück.', type: 'ankauf', color: '#7A4DDB', property_id: 'obj_kirch', lead_id: 'usr_christian', volume: 420000, budget: 440000, start: -8, due: 90 },
+  { id: 'prj_hege', name: 'Ankauf MFH Hegestraße', description: 'Due Diligence, Finanzierung und Beurkundung für das Mehrfamilienhaus in Eppendorf.', type: 'ankauf', color: '#14504F', property_id: 'obj_hege', lead_id: 'usr_christian', volume: 3450000, budget: 3620000, start: -34, due: 46 },
+  { id: 'prj_poel', name: 'Vermarktung ETW Poelchaukamp', description: 'Exposé, Besichtigungen und Verkauf der 3,5-Zimmer-Wohnung in Winterhude.', type: 'verkauf', color: '#2F6B45', property_id: 'obj_poel', lead_id: 'usr_joachim', volume: 795000, budget: 12000, start: -21, due: 62 },
+  { id: 'prj_bahr', name: 'Sanierung Bahrenfelder Straße', description: 'Strangsanierung, Heizungstausch und Aufwertung der Treppenhäuser.', type: 'sanierung', color: '#8A6212', property_id: 'obj_bahr', lead_id: 'usr_mikdat', volume: 480000, budget: 520000, start: -12, due: 180 },
+  { id: 'prj_best', name: 'Bestandsverwaltung 2026', description: 'Laufende Aufgaben aus Bestand: Nebenkosten, Mieterwechsel, Wartungen, ETVs.', type: 'verwaltung', color: '#2A5C8A', property_id: null, lead_id: 'usr_mikdat', volume: null, budget: null, start: -180, due: 143 },
+  { id: 'prj_kirch', name: 'Ankaufsprüfung Kirchwerder', description: 'Bauvoranfrage, Bodengutachten und Kalkulation für das Baugrundstück.', type: 'ankauf', color: '#5B4B8A', property_id: 'obj_kirch', lead_id: 'usr_christian', volume: 420000, budget: 440000, start: -8, due: 90 },
 ];
 
 /* ------------------------------------------------------------- Aufgaben */

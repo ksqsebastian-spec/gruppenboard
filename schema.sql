@@ -26,6 +26,7 @@ CREATE TABLE users (
   phone         TEXT,
   initials      TEXT NOT NULL,
   color         TEXT NOT NULL,
+  avatar        TEXT,
   created_at    TEXT NOT NULL
 );
 
@@ -179,9 +180,13 @@ CREATE TABLE events (
 CREATE INDEX idx_events_date ON events(date);
 
 CREATE TABLE documents (
-  id          TEXT PRIMARY KEY,
-  title       TEXT NOT NULL,
-  url         TEXT NOT NULL,
+  id           TEXT PRIMARY KEY,
+  title        TEXT NOT NULL,
+  url          TEXT,
+  storage_key  TEXT,
+  filename     TEXT,
+  content_type TEXT,
+  size         INTEGER,
   kind        TEXT NOT NULL DEFAULT 'sonstige',
   project_id  TEXT REFERENCES projects(id) ON DELETE CASCADE,
   property_id TEXT REFERENCES properties(id) ON DELETE CASCADE,

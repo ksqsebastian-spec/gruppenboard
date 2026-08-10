@@ -385,6 +385,73 @@ check('Feld auf leer setzbar', r.json.tasks.find((t) => t.id === mover.id).due_d
 r = await call('/api/state');
 check('Kein Emoji-Feld an Projekten', r.json.projects.every((p) => !('emoji' in p)), Object.keys(r.json.projects[0] || {}));
 
+/* --- Profilbild, E-Mail, Dateiupload --- */
+cookie = '';
+await call('/api/auth/login', 'POST', { login: 'christian.jonas', password: 'Mikdaten#Immo2026' });
+
+r = await call('/api/account', 'PATCH', { avatar: 'pixel:fuchs' });
+check('Profilbild gesetzt', r.status === 200 && r.json.user.avatar === 'pixel:fuchs', r.json);
+r = await call('/api/account', 'PATCH', { avatar: 'pixel:<script>' });
+check('Ungültiges Profilbild abgewiesen', r.status === 400, r.status);
+r = await call('/api/account', 'PATCH', { avatar: null });
+check('Profilbild zurücksetzbar', r.status === 200 && !r.json.user.avatar);
+
+r = await call('/api/account', 'PATCH', { email: 'c.jonas@mikdaten.de' });
+check('E-Mail geändert', r.status === 200 && r.json.user.email === 'c.jonas@mikdaten.de', r.json);
+r = await call('/api/account', 'PATCH', { email: 'kein-email' });
+check('Ungültige E-Mail abgewiesen', r.status === 400, r.status);
+r = await call('/api/account', 'PATCH', { email: 'joachim.kluge@mikdaten.de' });
+check('Doppelte E-Mail abgewiesen', r.status === 409, r.status);
+r = await call('/api/auth/login', 'POST', { login: 'c.jonas@mikdaten.de', password: 'Mikdaten#Immo2026' });
+check('Login mit neuer E-Mail', r.status === 200, r.status);
+await call('/api/account', 'PATCH', { email: 'christian.jonas@mikdaten.de' });
+
+async function uploadDoc(query, type, bytes, filename) {
+  const res = await worker.fetch(new Request(`https://x.dev/api/documents/upload?${query}`, {
+    method: 'POST',
+    headers: { 'x-mikdaten': '1', 'content-type': type, 'x-filename': encodeURIComponent(filename), cookie },
+    body: bytes,
+  }), env);
+  return { status: res.status, json: await res.json().catch(() => ({})) };
+}
+const PDF = Buffer.from('%PDF-1.4 Testinhalt');
+const beforeR2 = MEDIA._size();
+let docUp = await uploadDoc('property_id=obj_hege', 'application/pdf', PDF, 'Grundbuch Hegestraße.pdf');
+const docId = docUp.json.id;
+check("PDF hochgeladen", docUp.status === 200 && !!docId, docUp.json);
+check('Datei in R2', MEDIA._size() === beforeR2 + 1);
+r = await call('/api/state');
+const doc = r.json.documents.find((d) => d.id === docId);
+check('Dokument verweist auf die Datei', !!doc.storage_key && doc.url === null, doc);
+check('Titel ohne Dateiendung', doc.title === 'Grundbuch Hegestraße', doc.title);
+check('Größe erfasst', doc.size === PDF.length, doc.size);
+
+const dl = await worker.fetch(new Request('https://x.dev/media/' + doc.storage_key, { headers: { cookie } }), env);
+check('PDF wird ausgeliefert', dl.status === 200 && dl.headers.get('content-type') === 'application/pdf');
+check('PDF wird im Browser angezeigt', (dl.headers.get('content-disposition') || '').startsWith('inline'), dl.headers.get('content-disposition'));
+const dlForce = await worker.fetch(new Request('https://x.dev/media/' + doc.storage_key + '?dl=1&name=x.pdf', { headers: { cookie } }), env);
+check('Erzwungener Download', (dlForce.headers.get('content-disposition') || '').startsWith('attachment'), dlForce.headers.get('content-disposition'));
+
+docUp = await uploadDoc('property_id=obj_hege', 'application/x-msdownload', PDF, 'schad.exe');
+check('Unerlaubter Dateityp abgewiesen', docUp.status === 415, docUp.status);
+docUp = await uploadDoc('property_id=obj_hege', 'application/pdf', Buffer.alloc(26 * 1024 * 1024), 'gross.pdf');
+check('Datei über 25 MB abgewiesen', docUp.status === 413, docUp.status);
+docUp = await uploadDoc('', 'application/pdf', PDF, 'ohne.pdf');
+check('Upload ohne Bezug abgewiesen', docUp.status === 400, docUp.status);
+
+const zipUp = await uploadDoc('task_id=tsk_001', 'application/zip', PDF, 'anlagen.zip');
+r = await call('/api/state');
+check('Datei an Aufgabe', r.json.documents.some((d) => d.id === zipUp.json.id && d.task_id === 'tsk_001'));
+const zipDl = await worker.fetch(new Request('https://x.dev/media/' + r.json.documents.find((d) => d.id === zipUp.json.id).storage_key, { headers: { cookie } }), env);
+check('Archiv wird zum Download angeboten', (zipDl.headers.get('content-disposition') || '').startsWith('attachment'));
+
+const r2Before = MEDIA._size();
+r = await call('/api/documents/' + docId, 'DELETE');
+check('Dokument gelöscht', r.status === 200);
+check('Datei aus R2 entfernt', MEDIA._size() === r2Before - 1, MEDIA._size());
+r = await call('/api/state');
+check('Verknüpfte Links funktionieren weiter', r.json.documents.some((d) => d.url && !d.storage_key));
+
 // Health
 r = await call('/healthz');
 check('Healthcheck', r.status === 200 && r.json.ok === true);
